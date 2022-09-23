@@ -1,0 +1,110 @@
+\ProvidesPackage{cjwhw}
+
+%% Set up margins to work nicely with our layout
+\RequirePackage{amsmath, amsthm, amssymb}
+\RequirePackage[shortlabels]{enumitem}
+\RequirePackage{environ}
+\RequirePackage{fancyhdr}
+\RequirePackage{fix-cm}
+\RequirePackage{framed}
+\RequirePackage[margin=2.5cm]{geometry}
+\RequirePackage{hyperref}
+\RequirePackage{ifthen}
+\RequirePackage{listings}
+\RequirePackage{csquotes}
+
+\RequirePackage{lstautogobble}
+
+\RequirePackage{stmaryrd}
+\RequirePackage{tabularx}
+\RequirePackage{underscore}
+\RequirePackage{verbatim}
+
+\RequirePackage{enumitem}
+
+% have paragraphs separated by vertical space and no indentation
+\usepackage[parfill]{parskip}
+
+% make spacing around ':' and stuff work better
+\frenchspacing
+
+%% Scrub default headers and footers, and replace
+%% them with our own (Note: this is kinda hacky)
+\pagestyle{fancy}
+\lhead{}
+\chead{}
+\rhead{}
+\lfoot{}
+\cfoot{}
+\rfoot{\pagefooter}
+\renewcommand\headrulewidth{0pt}
+\renewcommand\footrulewidth{0pt}
+
+%% Make the first page special
+\thispagestyle{empty}
+\renewcommand{\maketitle}{\mainheader{}}
+\makeatletter
+\newcommand{\labTitle}{\mainheader{\@date}}
+\newcommand{\hwTitle}{
+    \mainheader{}
+    \begin{center}
+        {\large\bfseries \@date}
+    \end{center}
+    \setcounter{section}{-1}
+}
+\makeatother
+
+\newcommand{\CLASS}{}
+
+\newcounter{questionCounter}
+\newcounter{partCounter}[questionCounter]
+
+\newcommand{\questiontype}{Question}
+
+\providecommand{\question}{}
+
+\renewcommand{\question}[1][]{
+  % Wrap in minipage so that we don't get a line break enywhere in between
+  \begin{minipage}{\linewidth}%
+    \vspace{.2in}%
+    \ifthenelse{\equal{#1}{}}{
+      \stepcounter{questionCounter}%
+        \ifx\writtensection\undefined{}
+          \noindent{\bf \questiontype\ \arabic{questionCounter}}%
+          \else
+            \if\writtensection0
+            \noindent{\bf \questiontype\ \arabic{questionCounter}}%
+            \else
+            \noindent{\bf \questiontype\ \writtensection.\arabic{questionCounter}}%
+          \fi
+        \fi
+    }{
+      \noindent{\bf #1}
+    }
+    \vspace{0.2em} \hrule \vspace{.1in}% \\
+    \vspace*{-0.10cm}
+  \end{minipage}
+}
+
+\makeatletter
+\newcommand{\mainheader}[1]{
+   \pagestyle{myheadings}
+   \thispagestyle{plain}
+   \newpage
+   \setcounter{page}{1}
+   \noindent
+   \begin{center}
+   \framebox{
+      \vbox{\vspace{2mm}
+    \hbox to 6.28in { {\bf \CLASS \hfill} }
+       \vspace{6mm}
+       \hbox to 6.28in { {\Large \hfill \@title \hfill} }
+       \vspace{6mm}
+      \vspace{2mm}}
+   }
+   \end{center}
+   \vspace*{4mm}
+}
+
+\makeatother
+

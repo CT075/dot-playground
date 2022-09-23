@@ -1,0 +1,13 @@
+\RequirePackage{stackengine}
+\RequirePackage{graphicx}
+\RequirePackage{scalerel}
+\stackMath
+\def\ccdot{\scalebox{1.15}{$\SavedStyle\cdot$}}
+\def\genericform#1#2{\stackunder[#1]{\stackon[#2]{\SavedStyle\sim}{\ccdot}}{\ccdot}}
+\def\altdiv{\mathbin{\ThisStyle{\mathchoice%
+  {\genericform{-2.5pt}{-1.5pt}}%
+  {\genericform{-2.5pt}{-1.5pt}}%
+  {\genericform{-2.0pt}{-1.1pt}}%
+  {\genericform{-1.4pt}{-0.8pt}}%
+}}}
+

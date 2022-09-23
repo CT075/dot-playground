@@ -1,0 +1,14 @@
+
+\ProvidesPackage{mathindent}
+
+\RequirePackage{amsmath}
+\RequirePackage{array}
+
+\newdimen\longformulasindent
+\newenvironment{longformulas}
+ {\global\longformulasindent=0pt
+  \def\>{\global\advance\longformulasindent2em\relax\hspace{2em}}%
+  \def\<{\global\advance\longformulasindent-2em\relax\hspace{-2em}}%
+  \renewcommand{\arraystretch}{1.2}% some more room
+  \begin{array}{@{}>{\displaystyle\hspace{\longformulasindent}}l@{}}}
+ {\end{array}}

@@ -1,0 +1,233 @@
+\documentclass[a4paper, 10pt]{article}
+\usepackage{amssymb, amsmath, amsthm}
+\usepackage{enumitem}
+\usepackage{mathrsfs}
+\usepackage{parskip}
+\usepackage{mathpartir}
+\usepackage{stmaryrd}
+
+\newcommand{\Fwint}{\ensuremath{F^\omega_{..}\ }}
+\newcommand{\Dsub}{\ensuremath{D_{<:}}}
+\newcommand{\interval}[2]{#1 .. #2}
+\newcommand{\isctx}[1]{#1\ \texttt{ctx}}
+\newcommand{\iskd}[1]{#1\ \texttt{kd}}
+\newcommand{\TyKd}{*}
+\newcommand{\KDepArr}[3]{\Pi(#1:#2).#3}
+\newcommand{\subst}[3]{#1[#2/#3]}
+\newcommand{\isval}[1]{#1\ \texttt{val}}
+\newcommand{\isenv}[1]{#1\ \texttt{env}}
+\newcommand{\stepsn}[1][]{\Downarrow^{#1}}
+\newcommand{\KDenot}[2][\Gamma]{\llbracket #2 \rrbracket_{#1}}
+\newcommand{\KEval}[2][\Gamma]{\mathscr{E}\llbracket #2 \rrbracket_{#1}}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{defn}{Definition}
+\newtheorem{lemma}{Lemma}
+
+\setlength{\parindent}{0cm}
+
+\title{\Fwint Types are Strongly Normalizing}
+\author{Cameron Wong}
+
+\begin{document}
+\maketitle
+
+\section{Semantics of \Fwint}
+
+The presentation here is taken, slightly modified, from that of Sandro et. al.
+
+We omit the rules concerning terms for brevity.
+
+\begin{figure}[h]
+  \begin{align*}
+          & X,Y,Z... && \textbf{Type Variable} \\
+    A,B,\tau &::= X \mid \top \mid \bot \mid A \rightarrow B \mid
+        \forall(X:K).A \mid \lambda(X:K).A \mid A\ B
+      && \textbf{Type} \\
+    J,K,L &::= \TyKd \mid \interval{A}{B} \mid \KDepArr{X}{J}{K}
+      && \textbf{Kind} \\
+    \Gamma &::= \varnothing \mid \Gamma, x:A \mid \Gamma, X:K
+      && \textbf{Context}
+  \end{align*}
+  \caption{Syntax of \Fwint}
+\end{figure}
+
+\begin{figure}[ht]
+  \begin{mathpar}
+    \inferrule*[right=C-empty]{\phantom{}}{\isctx{\varnothing}} \and
+    \inferrule*[right=C-KdBind]{\isctx{\Gamma}\and\Gamma \vdash \iskd{K}}
+      {\isctx{\Gamma, X:K}} \and
+    \inferrule*[right=C-TpBind]{\isctx{\Gamma}\and\Gamma \vdash A : \TyKd}
+      {\isctx{\Gamma, x:A}}
+  \end{mathpar}
+  \caption{Context formation}
+\end{figure}
+
+\begin{figure}[ht]
+  \begin{mathpar}
+    \inferrule*[right=Wf-Type]{\phantom{}}{\Gamma \vdash \iskd{\TyKd}} \and
+    \inferrule*[right=Wf-Intv]
+      {\Gamma \vdash A : \TyKd \and \Gamma \vdash B : \TyKd}
+      {\Gamma \vdash \iskd{\interval{A}{B}}} \and
+    \inferrule*[right=Wf-DArr]
+      {\Gamma \vdash \iskd{J} \and \Gamma, X:J \vdash \iskd{K}}
+      {\Gamma \vdash \iskd{\KDepArr{X}{J}{K}}}
+  \end{mathpar}
+  \caption{Kind formation}
+\end{figure}
+
+\begin{figure}[ht]
+  \begin{mathpar}
+    \inferrule*[right=K-Var]{\isctx{\Gamma} \and \Gamma(X)=K}
+      {\Gamma \vdash X:K} \and
+    \inferrule*[right=K-Top]{\phantom{}}{\Gamma \vdash \top : \TyKd} \and
+    \inferrule*[right=K-Bot]{\phantom{}}{\Gamma \vdash \bot : \TyKd} \and
+    \inferrule*[right=K-Arr]
+      {\Gamma \vdash A : \TyKd \and \Gamma \vdash B : \TyKd}
+      {\Gamma \vdash A \rightarrow B : \TyKd} \and
+    \inferrule*[right=K-All]
+      {\Gamma \vdash \iskd{K} \and \Gamma, X:K \vdash A : \TyKd}
+      {\Gamma \vdash \forall(X:K).A : \TyKd} \and
+    \inferrule*[right=K-Abs]
+      {\Gamma \vdash \iskd{J} \and \Gamma, X:J \vdash A : K \and
+       \Gamma, X:J \vdash \iskd{K}}
+      {\Gamma \vdash \lambda(X:J).A : \KDepArr{X}{J}{K}} \and
+    \inferrule*[right=K-App]
+      {\Gamma \vdash A : \KDepArr{X}{J}{K} \and \Gamma \vdash B : J \and
+       \Gamma, X:J \vdash \iskd{K} \and \Gamma \vdash \iskd{\subst{K}{B}{X}}}
+      {\Gamma \vdash A\ B : \subst{K}{B}{X}} \and
+    \inferrule*[right=K-Sing]{\Gamma \vdash A : \interval{B}{C}}
+      {\Gamma \vdash A : \interval{A}{A}} \and
+    \inferrule*[right=K-Sub]
+      {\Gamma \vdash A:J \and \Gamma \vdash J \le K}{\Gamma \vdash A:K}
+  \end{mathpar}
+  \caption{Kind assignment}
+\end{figure}
+
+\begin{figure}[ht]
+  \begin{mathpar}
+    \inferrule*[right=SK-Intv]
+      {\Gamma \vdash A_2 \le A_1:\TyKd \and \Gamma \vdash B_1 \le B_2:\TyKd}
+      {\Gamma \vdash \interval{A_1}{B_1} \le \interval{A_2}{B_2}} \and
+    \inferrule*[right=SK-DArr]
+      {\Gamma \vdash \iskd{\KDepArr{X}{J_1}{K_1}} \and
+       \Gamma \vdash J_2 \le J_1 \and
+       \Gamma, X:J_2 \vdash K_1 \le K_2}
+      {\Gamma \vdash \KDepArr{X}{J_1}{K_1} \le \KDepArr{X}{J_2}{K_2}}
+  \end{mathpar}
+  \caption{Subkinding}
+\end{figure}
+
+As per Wang and Rompf, we use a runtime environment lookup-based evaluation
+strategy rather than a substitution-based one, detailed in figure \ref{rts}.
+
+\begin{figure}[ht]
+  \begin{align*}
+    H &::= \emptyset \mid H, X=\tau && \textbf{Runtime environment}
+  \end{align*}
+
+  \begin{mathpar}
+    \inferrule*[right=H-Emp]{\phantom{}}{\isenv{\emptyset}}\and
+    \inferrule*[right=H-Bind]{H \vdash \isval{\tau}}{\isenv{H, X=\tau}}
+  \end{mathpar}
+
+  \caption{Runtime structures}\label{rts}
+\end{figure}
+
+We use the judgment $H \vdash A \stepsn[n] \tau$ to say that $A$ steps to a
+type value $\tau$ in $n$ steps.
+
+\begin{figure}[ht]
+  \begin{mathpar}
+    \inferrule{\phantom{}}{H \vdash \isval{\top}} \and
+    \inferrule{\phantom{}}{H \vdash \isval{\bot}} \and
+    \inferrule{H \vdash \isval{A} \and H \vdash \isval{B}}
+      {H \vdash \isval{A \rightarrow B}} \and
+    \inferrule{\phantom{}}{H \vdash \isval{\forall(X:K).A}} \and
+    \inferrule{\phantom{}}{H \vdash \isval{\lambda(X:K).A}}
+  \end{mathpar}
+
+  \begin{mathpar}
+    \inferrule{H(X) = \tau}{H \vdash X \stepsn[0] \tau} \and
+    \inferrule{H \vdash A \stepsn[n] \tau_A \and H \vdash B \stepsn[m] \tau_B}
+      {H \vdash A \rightarrow B \stepsn[n+m] \tau_A \rightarrow \tau_B} \and
+    \inferrule
+      {H \vdash A \stepsn[a] \lambda(X:K).A' \and
+       H \vdash B \stepsn[b] \tau \and
+       H, X=\tau \vdash A' \stepsn[n] \tau'}
+      {H \vdash A\ B \stepsn[a+b+n] \tau'} \and
+  \end{mathpar}
+  \caption{Type reduction}
+\end{figure}
+
+\section{Analysis}
+
+We follow the method of Girard and Tait. For kinds $K$, we define its
+denotation $\KDenot{K}$ as the set of type values inhabiting $K$, given some
+type environment $\Gamma$. Type variables can appear in kinds in the bounds of
+some interval $\interval{A}{B}$, so this context is necessary to enforce that
+the correct subtyping relations are satisfied.
+
+\begin{defn}[Kind-Type Relation]
+  \begin{align*}
+    \KDenot{\TyKd} &= \{ \tau \} \\
+    \KDenot{\interval{A}{B}} &=
+      \{ \langle H, \tau \rangle \mid
+         \Gamma \vdash A \le B : \TyKd
+      \} \\
+    \KDenot{\KDepArr{X}{J}{K}} &=
+      \{ \langle H, \lambda(X:J).A \rangle \mid
+         \forall \tau_x \in \KDenot{J} .
+           \langle H(X \mapsto \tau_x), \tau \rangle \in
+           \KEval[\Gamma(X \mapsto \tau_x)]{K}
+      \} \\
+    \KEval{K} &=
+      \{ \langle H, A \rangle \mid
+         \exists n, \tau .
+           H \vdash A \stepsn[n] \tau \land
+           \tau \in \KDenot{K}
+      \}
+  \end{align*}
+\end{defn}
+
+\subsection{Inversion of Function Kinds}
+
+\begin{lemma}[Dependent Function canonical form and denotation inversion]
+  \begin{mathpar}
+    \inferrule*
+      {T \in \KDenot{\KDepArr{X}{J}{K}}}
+      {T = \langle H, \lambda (X:J).A \rangle \and
+       \forall \tau_x \in \KDenot{J} .
+         \langle H(X \rightarrow \tau_x), A \rangle
+         \in \KEval{\subst{K}{\tau_x}{X}}}
+  \end{mathpar}
+\end{lemma}
+
+\subsection{The main proof}
+
+\begin{theorem}[Strong Normalization of \Fwint types]
+  \begin{mathpar}
+    \inferrule*{\Gamma \vdash A : K \and \Gamma \models H}
+      {\langle H, A \rangle \in \KEval{K}}
+  \end{mathpar}
+\end{theorem}
+
+\begin{proof}
+  By induction on the derivation $\Gamma \vdash A : K$.
+
+  \begin{itemize}
+    \item Case \textsc{K-Top}, \textsc{K-Bot}, \textsc{K-All}, \textsc{K-Abs}:
+      Immediate.
+
+    \item Case \textsc{K-Var}: By the definition of consistent environments.
+
+    \item Case \textsc{K-Arr}, \textsc{K-Sing}: By the inductive hypotheses.
+
+    \item Case \textsc{K-App}:
+  \end{itemize}
+\end{proof}
+
+\appendix
+
+\end{document}
+
