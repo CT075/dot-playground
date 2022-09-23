@@ -178,7 +178,7 @@ the correct subtyping relations are satisfied.
 
 \begin{defn}[Kind-Type Relation]
   \begin{align*}
-    \KDenot{\TyKd} &= \{ \tau \} \\
+    \KDenot{\TyKd} &= \{ \langle H, \tau \rangle \} \\
     \KDenot{\interval{A}{B}} &=
       \{ \langle H, \tau \rangle \mid
          \Gamma \vdash A \le B : \TyKd
@@ -187,71 +187,51 @@ the correct subtyping relations are satisfied.
       \{ \langle H, \lambda(X:J).A \rangle \mid
          \forall \tau_x \in \KDenot{J} .
            \langle H(X \mapsto \tau_x), A \rangle \in
-           \KEval[\Gamma(X \mapsto \tau_x)]{K}
+           \KEval[\Gamma]{\subst{K}{\tau_x}{X}}
       \} \\
     \KEval{K} &=
       \{ \langle H, A \rangle \mid
          \exists \tau .
            H \vdash A \stepsn \tau \land
-           \tau \in \KDenot{K}
+           \langle H, \tau \rangle \in \KDenot{K}
       \}
   \end{align*}
 \end{defn}
 
-\subsection{Kind reduction}
+\subsection{Structural Lemmas}
 
-Unnormalized type expressions can appear in kinds as part of an interval, so we
-first show that the denotations of these kinds are invariant under type
-evaluation.
-
-\begin{lemma}[Subtype invariance under reduction]
+\begin{lemma}[Substitution commutes with normalization under denotation]
   \begin{mathpar}
     \inferrule*
-      {H \vdash A \stepsn[n] \tau \and
-       \Gamma \vdash A \le B : K \and
-       \Gamma \models H}
-      {\Gamma \vdash \tau \le B : K} \and
-    \inferrule*
-      {H \vdash B \stepsn[n] \tau
-       \Gamma \vdash A \le B \and
-       \Gamma \models H}
-      {\Gamma \vdash A \le \tau : K}
-  \end{mathpar}
-
-  \begin{proof}
-    By induction on the judgment $H \vdash A \stepsn[n] \tau$, using the
-    \textsc{ST-$\beta$} and \textsc{ST-$\eta$} rules.
-  \end{proof}
-\end{lemma}
-
-\begin{lemma}[Denotation invariance under reduction]
-  \begin{mathpar}
-    \inferrule*
-      {H \vdash A \stepsn[n] \tau \and
-       \Gamma \vdash \iskd{\subst{K}{A}{X}} \and
-       \Gamma \vdash \iskd{\subst{K}{\tau}{X}} \and
-       \Gamma \models H}
-      {\KDenot{\subst{K}{A}{X}} = \KDenot{\subst{K}{\tau}{X}}}
+      {\Gamma \vdash \iskd{K} \and
+       X \not\in \Gamma \and
+       \Gamma \models H \and
+       H \vdash A \stepsn[n] \tau}
+      {\KDenot{\subst{K}{A}{X}} = \KDenot{\subst{K}{\tau_x}{X}}}
   \end{mathpar}
 \end{lemma}
 
 \begin{proof}
-  By dual induction on the judgment $H \vdash A \stepsn[n] \tau$ and structure
-  of $K$.
+  By induction on the judgment $H \vdash A \stepsn \tau$.
 \end{proof}
 
 \subsection{Inversion of Function Kinds}
 
-\begin{lemma}[Dependent Function canonical form and denotation inversion]
+\begin{lemma}[Inversion of Dependent Functions]\label{depinvert}
   \begin{mathpar}
     \inferrule*
-      {T \in \KDenot{\KDepArr{X}{J}{K}}}
-      {T = \langle H, \lambda (X:J).A \rangle \and
-       \forall \tau_x \in \KDenot{J} .
-         \langle H(X \rightarrow \tau_x), A \rangle
+      {\langle H, \tau \rangle \in \KDenot{\KDepArr{X}{J}{K}} \and
+       \Gamma \models H}
+      {\tau = \lambda (X:J).A \and
+       \forall\tau_x \in \KDenot{J} .
+         \langle H(X \mapsto \tau_x), A \rangle
          \in \KEval{\subst{K}{\tau_x}{X}}}
   \end{mathpar}
 \end{lemma}
+
+\begin{proof}
+  By definition of $\KDenot{\cdot}$.
+\end{proof}
 
 \subsection{The main proof}
 
@@ -274,6 +254,20 @@ evaluation.
     \item Case \textsc{K-Arr}, \textsc{K-Sing}: By the inductive hypotheses.
 
     \item Case \textsc{K-App}:
+
+      By the inductive hypothesis on $\Gamma \vdash A : \KDepArr{X}{J}{X}$, we
+      have $\langle H, A \rangle \in \KEval{\KDepArr{X}{J}{K}}$, so $H \vdash A
+      \stepsn[n] \tau$ for some $n$ and $\langle H, \tau \rangle \in
+      \KDenot{\KDepArr{X}{J}{K}}$. Then, use lemma \ref{depinvert} and the
+      other inductive hypothesis to recover the premises to \textsc{Eval-app}.
+
+      % TODO
+      TODO: we get $\tau' \in \KDenot[\Gamma(X \mapsto \tau_B)]{K}$. need to
+      show that $\tau'$ is closed
+
+    \item Case \textsc{K-Sing}
+
+    \item Case \textsc{K-Sub}
   \end{itemize}
 \end{proof}
 
