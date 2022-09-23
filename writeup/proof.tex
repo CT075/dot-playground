@@ -135,27 +135,35 @@ strategy rather than a substitution-based one, detailed in figure \ref{rts}.
 \end{figure}
 
 We use the judgment $H \vdash A \stepsn[n] \tau$ to say that $A$ steps to a
-type value $\tau$ in $n$ steps.
+type value $\tau$ in $n$ steps. We also use $H \vdash A \stepsn \tau$ as
+shorthand for $\exists n . A \stepsn[n] \tau$.
 
 \begin{figure}[ht]
   \begin{mathpar}
     \inferrule{\phantom{}}{H \vdash \isval{\top}} \and
     \inferrule{\phantom{}}{H \vdash \isval{\bot}} \and
+    \inferrule{\phantom{}}{H \vdash \isval{\forall(X:K).A}} \and
+    \inferrule{\phantom{}}{H \vdash \isval{\lambda(X:K).A}} \and
     \inferrule{H \vdash \isval{A} \and H \vdash \isval{B}}
       {H \vdash \isval{A \rightarrow B}} \and
-    \inferrule{\phantom{}}{H \vdash \isval{\forall(X:K).A}} \and
-    \inferrule{\phantom{}}{H \vdash \isval{\lambda(X:K).A}}
+    \inferrule{H \vdash \isval{A} \and H \vdash \isval{B}}
+      {H \vdash \isval{\interval{A}{B}}}
   \end{mathpar}
 
   \begin{mathpar}
-    \inferrule{H(X) = \tau}{H \vdash X \stepsn[0] \tau} \and
-    \inferrule{H \vdash A \stepsn[n] \tau_A \and H \vdash B \stepsn[m] \tau_B}
+    \inferrule*[right=Eval-var]{H(X) = \tau}{H \vdash X \stepsn[0] \tau} \and
+    \inferrule*[right=Eval-arr]
+      {H \vdash A \stepsn[n] \tau_A \and H \vdash B \stepsn[m] \tau_B}
       {H \vdash A \rightarrow B \stepsn[n+m] \tau_A \rightarrow \tau_B} \and
-    \inferrule
+    \inferrule*[right=Eval-app]
       {H \vdash A \stepsn[a] \lambda(X:K).A' \and
        H \vdash B \stepsn[b] \tau \and
        H, X=\tau \vdash A' \stepsn[n] \tau'}
       {H \vdash A\ B \stepsn[a+b+n] \tau'} \and
+    \inferrule*[right=Eval-intv]
+      {H \vdash A \stepsn[a] \tau_A \and
+       H \vdash B \stepsn[b] \tau_B}
+      {H \vdash \interval{A}{B} \stepsn[a+b] \interval{\tau_A}{\tau_B}}
   \end{mathpar}
   \caption{Type reduction}
 \end{figure}
@@ -178,17 +186,59 @@ the correct subtyping relations are satisfied.
     \KDenot{\KDepArr{X}{J}{K}} &=
       \{ \langle H, \lambda(X:J).A \rangle \mid
          \forall \tau_x \in \KDenot{J} .
-           \langle H(X \mapsto \tau_x), \tau \rangle \in
+           \langle H(X \mapsto \tau_x), A \rangle \in
            \KEval[\Gamma(X \mapsto \tau_x)]{K}
       \} \\
     \KEval{K} &=
       \{ \langle H, A \rangle \mid
-         \exists n, \tau .
-           H \vdash A \stepsn[n] \tau \land
+         \exists \tau .
+           H \vdash A \stepsn \tau \land
            \tau \in \KDenot{K}
       \}
   \end{align*}
 \end{defn}
+
+\subsection{Kind reduction}
+
+Unnormalized type expressions can appear in kinds as part of an interval, so we
+first show that the denotations of these kinds are invariant under type
+evaluation.
+
+\begin{lemma}[Subtype invariance under reduction]
+  \begin{mathpar}
+    \inferrule*
+      {H \vdash A \stepsn[n] \tau \and
+       \Gamma \vdash A \le B : K \and
+       \Gamma \models H}
+      {\Gamma \vdash \tau \le B : K} \and
+    \inferrule*
+      {H \vdash B \stepsn[n] \tau
+       \Gamma \vdash A \le B \and
+       \Gamma \models H}
+      {\Gamma \vdash A \le \tau : K}
+  \end{mathpar}
+
+  \begin{proof}
+    By induction on the judgment $H \vdash A \stepsn[n] \tau$, using the
+    \textsc{ST-$\beta$} and \textsc{ST-$\eta$} rules.
+  \end{proof}
+\end{lemma}
+
+\begin{lemma}[Denotation invariance under reduction]
+  \begin{mathpar}
+    \inferrule*
+      {H \vdash A \stepsn[n] \tau \and
+       \Gamma \vdash \iskd{\subst{K}{A}{X}} \and
+       \Gamma \vdash \iskd{\subst{K}{\tau}{X}} \and
+       \Gamma \models H}
+      {\KDenot{\subst{K}{A}{X}} = \KDenot{\subst{K}{\tau}{X}}}
+  \end{mathpar}
+\end{lemma}
+
+\begin{proof}
+  By dual induction on the judgment $H \vdash A \stepsn[n] \tau$ and structure
+  of $K$.
+\end{proof}
 
 \subsection{Inversion of Function Kinds}
 
