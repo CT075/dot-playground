@@ -6,7 +6,7 @@
 \usepackage{mathpartir}
 \usepackage{stmaryrd}
 
-\newcommand{\Fwint}{\ensuremath{F^\omega_{..}\ }}
+\newcommand{\Fwint}{\ensuremath{F^\omega_{..}}}
 \newcommand{\Dsub}{\ensuremath{D_{<:}}}
 \newcommand{\interval}[2]{#1 .. #2}
 \newcommand{\isctx}[1]{#1\ \texttt{ctx}}
@@ -26,7 +26,7 @@
 
 \setlength{\parindent}{0cm}
 
-\title{\Fwint Types are Strongly Normalizing}
+\title{\Fwint\ Types are Strongly Normalizing}
 \author{Cameron Wong}
 
 \begin{document}
@@ -34,7 +34,7 @@
 
 \section{Semantics of \Fwint}
 
-The presentation here is taken, slightly modified, from that of Sandro et. al.
+The presentation here is taken, slightly modified, from that of Stucki et. al.
 
 We omit the rules concerning terms for brevity.
 
@@ -181,7 +181,8 @@ the correct subtyping relations are satisfied.
     \KDenot{\TyKd} &= \{ \langle H, \tau \rangle \} \\
     \KDenot{\interval{A}{B}} &=
       \{ \langle H, \tau \rangle \mid
-         \Gamma \vdash A \le B : \TyKd
+         \Gamma \vdash A \le \tau : \TyKd,
+         \Gamma \vdash \tau \le B : \TyKd,
       \} \\
     \KDenot{\KDepArr{X}{J}{K}} &=
       \{ \langle H, \lambda(X:J).A \rangle \mid
@@ -198,8 +199,39 @@ the correct subtyping relations are satisfied.
   \end{align*}
 \end{defn}
 
+Unlike Wang and Rompf, we do not need to track or ensure well-formedness of
+bounds in our denotation. In System \Dsub, interval types are themselves types.
+This meant that the \Dsub\ interpretation $\KDenot[\rho]{\text{Type }T_1..T_2}$
+could not enforce any restriction its $\text{Type }T$ members while remaining
+well-founded, leading to a loss of information when performing semantic
+widening. In System \Fwint, however, interval \emph{kinds} are of a different
+syntactic sort than the types they restrict, permitting the simpler definition
+of $\KDenot{\cdot}$.
+
+\subsection{Consistent Environments}
+
+\subsection{Semantic Subtyping}
+
+\begin{lemma}[Semantic Widening]
+  \begin{mathpar}
+    \inferrule*
+      {\Gamma \models H \and \Gamma \vdash K_1 \le K_2}
+      {\KDenot{K_1} \subseteq \KDenot{K_2}}
+  \end{mathpar}
+\end{lemma}
+
 \begin{proof}
-  By induction on the judgment $H \vdash A \stepsn \tau$.
+  By induction on the subkinding relation.
+
+  \begin{itemize}
+    \item Case \textsc{SK-Intv}:
+
+      By transitivity of subtyping.
+
+    \item Case \textsc{SK-DArr}:
+
+      By the inductive hypotheses, strengthening as necessary.
+  \end{itemize}
 \end{proof}
 
 \subsection{Inversion of Function Kinds}
@@ -248,19 +280,24 @@ the correct subtyping relations are satisfied.
       \KDenot{\KDepArr{X}{J}{K}}$. Then, use lemma \ref{depinvert} and the
       other inductive hypothesis to recover the premises to \textsc{Eval-app}.
 
-      % TODO
-      TODO: we get $\tau' \in \KDenot[\Gamma(X \mapsto \tau_B)]{K}$. need to
-      show that $\tau'$ is closed
+      Note that $\tau'$ is a type value and is therefore closed, so it is valid
+      to strengthen $\Gamma, X: \tau_B$ back to $\Gamma$
 
     \item Case \textsc{K-Abs}:
+
+      By the inductive hypothesis.
 
     \item Case \textsc{K-Sub}:
   \end{itemize}
 \end{proof}
 
+\section{Scaling up to DOT}
+
+Thus far,
+
 \appendix
 
-\subsection{Structural Lemmas}
+\section{Structural Lemmas}
 
 \begin{lemma}[Substitution commutes with normalization under denotation]
   \begin{mathpar}
@@ -272,6 +309,31 @@ the correct subtyping relations are satisfied.
       {\KDenot{\subst{K}{A}{X}} = \KDenot{\subst{K}{\tau_x}{X}}}
   \end{mathpar}
 \end{lemma}
+
+\begin{proof}
+  By induction on the judgment $H \vdash A \stepsn \tau$.
+\end{proof}
+
+\begin{lemma}[Big-step evaluation results in a value]
+  \begin{mathpar}
+    \inferrule*{\Gamma \models H \and H \vdash A \stepsn[n] \tau}
+      {\Gamma \vdash \isval{\tau}}
+  \end{mathpar}
+\end{lemma}
+
+\begin{proof}
+  By induction on the stepping judgment.
+\end{proof}
+
+\begin{lemma}[Type values are closed]
+  \begin{mathpar}
+    \inferrule*{H \vdash \isval{\tau}}{\emptyset \vdash \isval{\tau}}
+  \end{mathpar}
+\end{lemma}
+
+\begin{proof}
+  By induction on the judgment $H \vdash \isval{\tau}$.
+\end{proof}
 
 \end{document}
 
