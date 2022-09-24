@@ -198,19 +198,6 @@ the correct subtyping relations are satisfied.
   \end{align*}
 \end{defn}
 
-\subsection{Structural Lemmas}
-
-\begin{lemma}[Substitution commutes with normalization under denotation]
-  \begin{mathpar}
-    \inferrule*
-      {\Gamma \vdash \iskd{K} \and
-       X \not\in \Gamma \and
-       \Gamma \models H \and
-       H \vdash A \stepsn[n] \tau}
-      {\KDenot{\subst{K}{A}{X}} = \KDenot{\subst{K}{\tau_x}{X}}}
-  \end{mathpar}
-\end{lemma}
-
 \begin{proof}
   By induction on the judgment $H \vdash A \stepsn \tau$.
 \end{proof}
@@ -235,7 +222,7 @@ the correct subtyping relations are satisfied.
 
 \subsection{The main proof}
 
-\begin{theorem}[Strong Normalization of \Fwint types]
+\begin{theorem}[Strong Normalization of types]
   \begin{mathpar}
     \inferrule*{\Gamma \vdash A : K \and \Gamma \models H}
       {\langle H, A \rangle \in \KEval{K}}
@@ -246,7 +233,7 @@ the correct subtyping relations are satisfied.
   By induction on the derivation $\Gamma \vdash A : K$.
 
   \begin{itemize}
-    \item Case \textsc{K-Top}, \textsc{K-Bot}, \textsc{K-All}, \textsc{K-Abs}:
+    \item Case \textsc{K-Top}, \textsc{K-Bot}, \textsc{K-All}:
       Immediate.
 
     \item Case \textsc{K-Var}: By the definition of consistent environments.
@@ -265,13 +252,26 @@ the correct subtyping relations are satisfied.
       TODO: we get $\tau' \in \KDenot[\Gamma(X \mapsto \tau_B)]{K}$. need to
       show that $\tau'$ is closed
 
-    \item Case \textsc{K-Sing}
+    \item Case \textsc{K-Abs}:
 
-    \item Case \textsc{K-Sub}
+    \item Case \textsc{K-Sub}:
   \end{itemize}
 \end{proof}
 
 \appendix
+
+\subsection{Structural Lemmas}
+
+\begin{lemma}[Substitution commutes with normalization under denotation]
+  \begin{mathpar}
+    \inferrule*
+      {\Gamma \vdash \iskd{K} \and
+       X \not\in \Gamma \and
+       \Gamma \models H \and
+       H \vdash A \stepsn[n] \tau}
+      {\KDenot{\subst{K}{A}{X}} = \KDenot{\subst{K}{\tau_x}{X}}}
+  \end{mathpar}
+\end{lemma}
 
 \end{document}
 
