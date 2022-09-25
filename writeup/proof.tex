@@ -176,46 +176,56 @@ type environment $\Gamma$. Type variables can appear in kinds in the bounds of
 some interval $\interval{A}{B}$, so this context is necessary to enforce that
 the correct subtyping relations are satisfied.
 
-\begin{defn}[Kind-Type Relation]
-  \begin{align*}
-    \KDenot{\TyKd} &= \{ \langle H, \tau \rangle \} \\
-    \KDenot{\interval{A}{B}} &=
-      \{ \langle H, \tau \rangle \mid
-         \Gamma \vdash A \le \tau : \TyKd,
-         \Gamma \vdash \tau \le B : \TyKd,
-      \} \\
-    \KDenot{\KDepArr{X}{J}{K}} &=
-      \{ \langle H, \lambda(X:J).A \rangle \mid
-         \forall \tau_x \in \KDenot{J} .
-           \langle H(X \mapsto \tau_x), A \rangle \in
-           \KEval[\Gamma]{\subst{K}{\tau_x}{X}}
-      \} \\
-    \KEval{K} &=
-      \{ \langle H, A \rangle \mid
-         \exists \tau .
-           H \vdash A \stepsn \tau \land
-           \langle H, \tau \rangle \in \KDenot{K}
-      \}
-  \end{align*}
-\end{defn}
+\begin{figure}[ht]
+  \begin{defn}[Kind-Type Relation]
+    \begin{align*}
+      \KDenot{\TyKd} &= \{ \langle H, \tau \rangle \} \\
+      \KDenot{\interval{A}{B}} &=
+        \{ \langle H, \tau \rangle \mid
+           \Gamma \vdash A \le \tau : \TyKd,
+           \Gamma \vdash \tau \le B : \TyKd,
+        \} \\
+      \KDenot{\KDepArr{X}{J}{K}} &=
+        \{ \langle H, \lambda(X:J).A \rangle \mid
+           \forall \tau_x \in \KDenot{J} .
+             \langle H(X \mapsto \tau_x), A \rangle \in
+             \KEval[\Gamma]{\subst{K}{\tau_x}{X}}
+        \} \\
+      \KEval{K} &=
+        \{ \langle H, A \rangle \mid
+           \exists \tau .
+             H \vdash A \stepsn \tau \land
+             \langle H, \tau \rangle \in \KDenot{K}
+        \}
+    \end{align*}
+  \end{defn}
+\end{figure}
 
-Unlike Wang and Rompf, we do not need to track or ensure well-formedness of
-bounds in our denotation. In System \Dsub, interval types are themselves types.
-This meant that the \Dsub\ interpretation $\KDenot[\rho]{\text{Type }T_1..T_2}$
-could not enforce any restriction its $\text{Type }T$ members while remaining
-well-founded, leading to a loss of information when performing semantic
-widening. In System \Fwint, however, interval \emph{kinds} are of a different
-syntactic sort than the types they restrict, permitting the simpler definition
-of $\KDenot{\cdot}$.
+\begin{figure}[ht]
+  \begin{defn}[Consistent environments]
+    \begin{mathpar}
+      \inferrule*{\phantom{}}{\varnothing \models \emptyset} \and
+      \inferrule*
+        {\Gamma \models H \and \Gamma \vdash \tau: K \and \isenv{H,X=\tau}}
+        {\Gamma, X:K \models H,X=\tau}
+    \end{mathpar}
+  \end{defn}
+\end{figure}
 
-\subsection{Consistent Environments}
+Unlike Wang and Rompf, we do not need to track bounds in our denotation. In
+System \Dsub, interval types are themselves types. This meant that the
+\Dsub\ interpretation $\KDenot[\rho]{\text{Type }T_1..T_2}$ could not enforce
+any restriction its $\text{Type }T$ members while remaining well-founded,
+leading to a loss of information when performing semantic widening. In System
+\Fwint, however, interval \emph{kinds} are of a different syntactic sort than
+the types they restrict, permitting the simpler definition of $\KDenot{\cdot}$.
 
 \subsection{Semantic Subtyping}
 
 \begin{lemma}[Semantic Widening]
   \begin{mathpar}
     \inferrule*
-      {\Gamma \models H \and \Gamma \vdash K_1 \le K_2}
+      {\Gamma \vdash K_1 \le K_2}
       {\KDenot{K_1} \subseteq \KDenot{K_2}}
   \end{mathpar}
 \end{lemma}
@@ -230,9 +240,14 @@ of $\KDenot{\cdot}$.
 
     \item Case \textsc{SK-DArr}:
 
-      By the inductive hypotheses, strengthening as necessary.
+      By the inductive hypotheses.
   \end{itemize}
 \end{proof}
+
+As bounds can no longer be nested, we do not need to enforce that they are
+"good" -- while we can still \emph{construct} the ill-bounded kind
+$\interval{\top}{\bot}$, there is no type-level \texttt{null} to provide a
+spurious witness.
 
 \subsection{Inversion of Function Kinds}
 
@@ -265,12 +280,13 @@ of $\KDenot{\cdot}$.
   By induction on the derivation $\Gamma \vdash A : K$.
 
   \begin{itemize}
-    \item Case \textsc{K-Top}, \textsc{K-Bot}, \textsc{K-All}:
-      Immediate.
+    \item Case \textsc{K-Top}, \textsc{K-Bot}, \textsc{K-All}: Immediate.
 
     \item Case \textsc{K-Var}: By the definition of consistent environments.
 
     \item Case \textsc{K-Arr}, \textsc{K-Sing}: By the inductive hypotheses.
+
+    \item Case \textsc{K-Abs}: By the inductive hypothesis.
 
     \item Case \textsc{K-App}:
 
@@ -283,17 +299,10 @@ of $\KDenot{\cdot}$.
       Note that $\tau'$ is a type value and is therefore closed, so it is valid
       to strengthen $\Gamma, X: \tau_B$ back to $\Gamma$
 
-    \item Case \textsc{K-Abs}:
-
-      By the inductive hypothesis.
-
-    \item Case \textsc{K-Sub}:
+    \item Case \textsc{K-Sub}: By the inductive hypothesis and semantic
+      widening.
   \end{itemize}
 \end{proof}
-
-\section{Scaling up to DOT}
-
-Thus far,
 
 \appendix
 
@@ -333,6 +342,19 @@ Thus far,
 
 \begin{proof}
   By induction on the judgment $H \vdash \isval{\tau}$.
+\end{proof}
+
+\begin{lemma}[Weakening/Strengthening]
+  The type-kind relation is invariant under extending and shrinking the
+  context.
+
+  \begin{mathpar}
+    \inferrule*{X \not\in FV(K)}{\KDenot{K} = \KDenot[\Gamma(X \mapsto K')]{K}}
+  \end{mathpar}
+\end{lemma}
+
+\begin{proof}
+  By induction on $K$.
 \end{proof}
 
 \end{document}
