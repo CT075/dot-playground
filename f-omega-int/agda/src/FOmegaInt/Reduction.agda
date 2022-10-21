@@ -10,7 +10,7 @@ open import FOmegaInt.Syntax hiding (Context; lookup)
 infix 4 _⊢_val
 
 data Env : ℕ → Set
-record Val {n : ℕ} : Set
+record Val : Set
 
 data _⊢_val {n} (H : Env n) : Type n → Set where
   v-top : H ⊢ ⊤ val
@@ -19,13 +19,22 @@ data _⊢_val {n} (H : Env n) : Type n → Set where
   v-abs : ∀{K A} → H ⊢ ƛ K A val
   v-arr : ∀{A B} → H ⊢ A val → H ⊢ B val → H ⊢ A ⇒ B val
 
-record Val {n} where
+{-
+data Val : Set where
+  v-⊤ : Val
+  v-⊥ : Val
+  v-∀'_∙⟨_,_⟩ : {n} → Env (suc n) → Kind n → Type (suc n) → Val
+  v-ƛ_∙⟨_,_⟩ : {n} → Env (suc n) → Kind n → Type (suc n) → Val
+  v-_⇒_ : {n} → Type n → Type n → Val
+  -}
+
+record Val where
   inductive
-  constructor _[_,_]
+  constructor [_]⟨_,_⟩
   field
+    n : ℕ
     this : Type n
     H : Env n
-    p : H ⊢ this val
 
 data Env where
   [] : Env zero
@@ -36,36 +45,10 @@ lookup {zero} _ ()
 lookup {suc _} (τ ∷ _) zero = τ
 lookup {suc _} (_ ∷ H) (suc i) = lookup H i
 
-data Finished : Set where
-  VAL : Val → Finished
-  ERROR : Finished
-  TIMEOUT : Finished
-
-_>>=_ : Finished → (Val → Finished) → Finished
-VAL v >>= f = f v
-ERROR >>= _ = ERROR
-TIMEOUT >>= _ = TIMEOUT
-
-_>>_ : Finished → Finished → Finished
-a >> b = a >>= (λ _ → b)
-
--- Big step rules
-
-eval : ∀{n} → (gas : ℕ) → Env n → Type n → Finished
-eval n H (Var x) = VAL (lookup H x)
-eval n H ⊤ = VAL (⊤ [ H , v-top ])
-eval n H ⊥ = VAL (⊥ [ H , v-bot ])
-eval n H τ@(∀' _ _) = VAL (τ [ H , v-all ])
-eval zero H _ = TIMEOUT
-eval (suc n) H (A ⇒ B) = do
-  a [ H₁ , pa ] ← eval n H A
-  b [ H₂ , pb ] ← eval n H₁ B
-  VAL ((a ⇒ b)[ H₂ , v-arr pa pb ])
-
 infix 4 _⊢_⟱[_]_
 
-data _⊢_⟱[_]_ {n : ℕ} (H : Env n) : Type n → ℕ → Type zero → Set where
-  eval-var : ∀{x τ} → lookup H x ≡ τ → H ⊢ Var x ⟱[ 0 ] (Val.this τ)
-  eval-arr : ∀{A B α β n m} →
-    H ⊢ A ⟱[ n ] α → H ⊢ B ⟱[ m ] β → H ⊢ A ⇒ B ⟱[ n + m ] α ⇒ β
+data _⊢_⟱[_]_ {n : ℕ} (H : Env n) : Type n → ℕ → Val → Set where
+  eval-var : ∀{x τ} → lookup H x ≡ τ → H ⊢ Var x ⟱[ 0 ] τ
+  eval-arr : ∀{A B α β a b} →
+    H ⊢ A ⟱[ a ] α → H ⊢ B ⟱[ b ] β → H ⊢ A ⇒ B ⟱[ a + b ] α ⇒ β
 
