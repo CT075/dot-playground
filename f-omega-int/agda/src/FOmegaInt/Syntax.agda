@@ -100,7 +100,7 @@ module Ops where
   plugKd : ∀{n : ℕ} → Kind (suc n) → Type n → Kind n
   plugKd k τ = k /Kd (sub τ)
 
-open Ops using (weakenTy; weakenKd; plugTy; plugKd) public
+open Ops using (weakenTy; weakenTy*; weakenKd; plugTy; plugKd) public
 
 module Context where
   open C hiding (Ctx)
