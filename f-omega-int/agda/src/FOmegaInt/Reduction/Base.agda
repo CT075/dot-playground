@@ -23,12 +23,11 @@ data _⊢_val {n} H where
   v-abs : ∀{K A} → H ⊢ ƛ K A val
   v-arr : ∀{A B} → H ⊢ A val → H ⊢ B val → H ⊢ A ⇒ B val
 
-record Val (n : ℕ) : Set where
+record Val (n : ℕ) (H : Env n) : Set where
   constructor V
   field
-    closure : Env n
     this : Type n
-    proof : closure ⊢ this val
+    proof : H ⊢ this val
 
 weaken-isVal : ∀{n} {H : Env n} {τ} →
   H ⊢ τ val → (τ' : Type n) → (p : H ⊢ τ' val) →
@@ -40,50 +39,15 @@ weaken-isVal v-abs _ _ = v-abs
 weaken-isVal (v-arr pA pB) τ' p =
   v-arr (weaken-isVal pA τ' p) (weaken-isVal pB τ' p)
 
-weakenVal : ∀{n} →
-  (v : Val n) → (τ' : Type n) → (Val.closure v) ⊢ τ' val → Val (suc n)
-weakenVal (V H τ proof) τ' p =
-  V (H , τ' [ p ]) (weakenTy τ) (weaken-isVal proof τ' p)
+weakenVal : ∀{n H} →
+  (v : Val n H) → (τ' : Type n) → (p : H ⊢ τ' val) → Val (suc n) (H , τ' [ p ])
+weakenVal (V τ proof) τ' p =
+  V (weakenTy τ) (weaken-isVal proof τ' p)
 
-lookup : ∀{n} → Env n → Fin n → Val n
-lookup-closure : ∀{n} →
-  (H : Env n) → (i : Fin n) → Val.closure (lookup H i) ≡ H
-
-roundtrip-closure : ∀{n} (H : Env n) → ∀{τ} → (i : Fin n) →
-  H ⊢ τ val → Val.closure (lookup H i) ⊢ τ val
-
+lookup : ∀{n} → (H : Env n) → Fin n → Val n H
 lookup ∅ ()
-lookup (H , τ [ p ]) zero = weakenVal (V H τ p) τ p
-lookup (H , τ [ p ]) (suc i) =
-  weakenVal (lookup H i) τ (roundtrip-closure H i p)
-
-roundtrip-closure H i p rewrite lookup-closure H i = p
-
-lookup-closure ∅ ()
-lookup-closure (H , τ [ p ]) zero = let open ≡-Reasoning in begin
-  Val.closure (lookup (H , τ [ p ]) zero) ≡⟨ refl ⟩
-  Val.closure (weakenVal (V H τ p) τ p) ≡⟨ refl ⟩
-  Val.closure (V (H , τ [ p ]) (weakenTy τ) (weaken-isVal p τ p)) ≡⟨ refl ⟩
-  (H , τ [ p ])
-  ∎
-lookup-closure (H , τ [ p ]) (suc i) = let open ≡-Reasoning in begin
-  Val.closure (lookup (H , τ [ p ]) (suc i))
-    ≡⟨ refl ⟩
-  Val.closure (weakenVal (lookup H i) τ (roundtrip-closure H i p))
-    ≡⟨ refl ⟩
-  Val.closure (V
-      (Val.closure (lookup H i) , τ [ roundtrip-closure H i p ])
-      (weakenTy (Val.this (lookup H i)))
-      (weaken-isVal (Val.proof (lookup H i)) τ (roundtrip-closure H i p)))
-    ≡⟨ refl ⟩
-  Val.closure (lookup H i) , τ [ roundtrip-closure H i p ]
-    ≡⟨ unRoundtrip ⟩
-  H , τ [ p ]
-    ∎
-  where
-    unRoundtrip :
-      Val.closure (lookup H i) , τ [ roundtrip-closure H i p ] ≡ H , τ [ p ]
-    unRoundtrip rewrite lookup-closure H i = refl
+lookup (H , τ [ p ]) zero = weakenVal (V τ p) τ p
+lookup (H , τ [ p ]) (suc i) = weakenVal (lookup H i) τ p
 
 lookupTy : ∀{n} → Env n → Fin n → Type n
 lookupTy H i = Val.this (lookup H i)

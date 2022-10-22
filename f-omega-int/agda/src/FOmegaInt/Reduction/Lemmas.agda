@@ -9,10 +9,10 @@ open import FOmegaInt.Reduction.Base
 
 ⟱-spec : ∀{n gas} {H : Env n} {t : Type n} {τ : Type n} →
   H ⊢ t ⟱[ gas ] τ → H ⊢ τ val
-⟱-spec (eval-var {x} {v} p) = {! !}
+⟱-spec {_} {_} {H} (eval-var {x} {v} p) = {!!}
 ⟱-spec eval-⊤ = v-top
 ⟱-spec eval-⊥ = v-bot
 ⟱-spec eval-∀' = v-all
 ⟱-spec eval-ƛ = v-abs
 ⟱-spec (eval-arr pA pB) = v-arr (⟱-spec pA) (⟱-spec pB)
-⟱-spec (eval-app e e₁ e₂) = {! !}
+⟱-spec (eval-app pA pB pAB) = {! !}
