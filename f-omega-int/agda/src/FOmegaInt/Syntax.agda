@@ -1,9 +1,10 @@
 module FOmegaInt.Syntax where
 
-open import Data.Fin using (Fin; suc; zero)
+open import Data.Fin using (Fin; suc; zero; inject₁)
 import Data.Fin.Substitution as S
 open import Data.Fin.Substitution.Lemmas
 open import Data.Nat using (ℕ; suc; zero; _+_)
+open import Data.Bool using (if_then_else_)
 import Data.Vec as Vec
 
 import Data.Context as C
@@ -92,7 +93,7 @@ module Ops where
 
   open S.Application tyApp public using () renaming (_/_ to _/Ty_)
   open S.Application kdApp public using () renaming (_/_ to _/Kd_)
-  open S.Lift typeLift using (sub)
+  open S.Lift typeLift public using (sub; _↑)
 
   plugTy : ∀{n : ℕ} → Type (suc n) → Type n → Type n
   plugTy t τ = t /Ty (sub τ)
@@ -100,7 +101,17 @@ module Ops where
   plugKd : ∀{n : ℕ} → Kind (suc n) → Type n → Kind n
   plugKd k τ = k /Kd (sub τ)
 
-open Ops using (weakenTy; weakenTy*; weakenKd; plugTy; plugKd) public
+open Ops using
+  ( weakenTy
+  ; weakenTy*
+  ; weakenKd
+  ; plugTy
+  ; plugKd
+  ; _/Ty_
+  ; _/Kd_
+  ; sub
+  ; _↑
+  ) public
 
 module Context where
   open C hiding (Ctx)
@@ -114,4 +125,4 @@ module Context where
 
   open C.WeakenOps Kind weakenOps public
 
-open Context using (lookup) renaming (Ctx to Context) public
+open Context using (lookup; insertUnder) renaming (Ctx to Context) public
