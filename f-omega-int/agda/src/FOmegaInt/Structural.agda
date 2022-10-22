@@ -6,7 +6,7 @@ open import Data.Fin using (Fin; zero; suc; inject₁)
 open import Data.Context
 open import FOmegaInt.Syntax renaming (lookup to lookupKd)
 open import FOmegaInt.Typing
-open import FOmegaInt.Reduction hiding (insertUnder)
+open import FOmegaInt.Reduction
 
 private
   injectTy : ∀{n} → Type n → Type (suc n)

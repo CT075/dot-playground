@@ -1,6 +1,6 @@
 module FOmegaInt.Syntax where
 
-open import Data.Fin using (Fin; suc; zero; inject₁)
+open import Data.Fin using (Fin; suc; zero)
 import Data.Fin.Substitution as S
 open import Data.Fin.Substitution.Lemmas
 open import Data.Nat using (ℕ; suc; zero; _+_)
