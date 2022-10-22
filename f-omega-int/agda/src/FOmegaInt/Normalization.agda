@@ -74,6 +74,7 @@ typesNormalize : ∀{n} {Γ : Context n} {H : Env n} {A K} →
 typesNormalize (k-var Γ-is-ctx trace) cs =
   let L τ kinding proof = consistentEnv cs trace
    in
+  -- TODO: structural lemmas wheeeeeeeee
   N 0 τ {!!} {!!}
 typesNormalize k-top _ = N 0 ⊤ eval-⊤ (denot-typ v-top)
 typesNormalize k-bot _ = N 0 ⊥ eval-⊥ (denot-typ v-bot)
@@ -92,9 +93,12 @@ typesNormalize {n} {Γ} {H} (k-abs {J} {K} {A} pJ pK pA) cs =
       denot = denot-abs d-inner
    in
   N 0 (ƛ J A) eval-ƛ denot
-typesNormalize (k-app rule rule₁ x x₁) _ = {! !}
-typesNormalize (k-sing {A} {B} {C} p) cs =
+typesNormalize (k-app rule rule₁ x x₁) _ =
+  -- TODO: inversion!!!!!!
+  {! !}
+typesNormalize (k-sing p) cs =
   let N n τ eval denot = typesNormalize p cs
    in
-  N n τ eval {!!}
+  -- TODO: need to show that A ⟱ τ implies τ ≤ A
+  N n τ eval (denot-intv {!!} {!!} (⟱-spec eval))
 typesNormalize (k-sub rule x) _ = {! !}
