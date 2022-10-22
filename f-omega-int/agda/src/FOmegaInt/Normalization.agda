@@ -2,7 +2,7 @@ module FOmegaInt.Normalization where
 
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Fin using (Fin; zero; suc)
-open import Relation.Binary.PropositionalEquality as PropEq hiding ([_])
+open import Relation.Binary.PropositionalEquality as PropEq
 
 open import Data.Context
 open import FOmegaInt.Syntax renaming (lookup to lookupKd)
@@ -48,15 +48,29 @@ record Lookup {n : ℕ}
     proof : lookup H v ≡ τ
 
 consistentEnv : ∀{n} {Γ : Context n} {H : Env n} {K : Kind n} →
-  Γ ⊨ H → (v : Fin n) → lookupKd Γ v ≡ K → Lookup Γ H K v
-consistentEnv {zero} {[]} {[]} {_} c-emp ()
-consistentEnv {suc n} {K ∷ Γ} {τ ∷ H} {_} (c-cons pk p) zero refl =
-  L (weakenTy τ) (weaken-kinding pk) refl
-consistentEnv {suc n} {K ∷ Γ} {τ ∷ H} {_} (c-cons k p) (suc i) refl = {!!}
+  Γ ⊨ H → {v : Fin n} → lookupKd Γ v ≡ K → Lookup Γ H K v
+consistentEnv {zero} {[]} {[]} {_} c-emp {()}
+consistentEnv {suc n} {K ∷ _} {τ ∷ _} {_} (c-cons k _) {zero} refl =
+  L (weakenTy τ) (weaken-kinding k) refl
+consistentEnv {suc n} {K ∷ Γ} {t ∷ H} {_} (c-cons _ p) {suc i} refl =
+  let L τ kinding proof = consistentEnv {n} {Γ} {H} p {i} refl
+
+      open ≡-Reasoning
+      proof' : lookup (t ∷ H) (suc i) ≡ weakenTy τ
+      proof' = begin
+        lookup (t ∷ H) (suc i) ≡⟨ refl ⟩
+        weakenTy (lookup H i) ≡⟨ cong weakenTy proof ⟩
+        weakenTy τ
+        ∎
+   in
+  L (weakenTy τ) (weaken-kinding kinding) proof'
 
 typesNormalize : ∀{n} {Γ : Context n} {H : Env n} {A K} →
   Γ ⊢ty A ∈ K → Γ ⊨ H → ⟨ H , A ⟩∈ℰ⟦ K ⟧[ Γ ]
-typesNormalize (k-var ctx trace) cs = {! !}
+typesNormalize (k-var Γ-is-ctx trace) cs =
+  let L τ kinding proof = consistentEnv cs trace
+   in
+  N 0 τ (eval-var proof) {!!}
 typesNormalize k-top _ = N 0 ⊤ eval-⊤ denot-typ
 typesNormalize k-bot _ = N 0 ⊥ eval-⊥ denot-typ
 typesNormalize (k-arr pA pB) cs =
