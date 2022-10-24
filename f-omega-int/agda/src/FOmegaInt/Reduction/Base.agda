@@ -49,9 +49,6 @@ lookup ∅ ()
 lookup (H , τ [ p ]) zero = weakenVal (V τ p) τ p
 lookup (H , τ [ p ]) (suc i) = weakenVal (lookup H i) τ p
 
-lookupTy : ∀{n} → Env n → Fin n → Type n
-lookupTy H i = Val.this (lookup H i)
-
 data _⊢_⟱[_]_ {n : ℕ} (H : Env n) : Type n → ℕ → Type n → Set where
   eval-var : ∀{x v} → lookup H x ≡ v → H ⊢ Var x ⟱[ 0 ] (Val.this v)
   eval-⊤ : H ⊢ ⊤ ⟱[ 0 ] ⊤
@@ -62,7 +59,7 @@ data _⊢_⟱[_]_ {n : ℕ} (H : Env n) : Type n → ℕ → Type n → Set wher
     H ⊢ A ⟱[ a ] α → H ⊢ B ⟱[ b ] β → H ⊢ A ⇒ B ⟱[ a + b ] (α ⇒ β)
   eval-app : ∀{A B A' τ α K a b pτ n} →
     H ⊢ A ⟱[ a ] (ƛ K A') → H ⊢ B ⟱[ b ] τ → (H , τ [ pτ ]) ⊢ A' ⟱[ n ] α →
-    -- This [plugTy] makes me uncomfortable; it seems to defeat the entire
+    -- XXX: This [plugTy] makes me uncomfortable; it seems to defeat the entire
     -- purpose of using environment-based semantics over substitution semantics
     -- in the first place.
     H ⊢ A ∙ B ⟱[ a + b + n ] (plugTy α τ)

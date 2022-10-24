@@ -2,6 +2,7 @@ module FOmegaInt.Typing where
 
 open import Data.Fin using (Fin; suc; zero)
 open import Data.Nat using (ℕ; suc; zero; _+_)
+open import Data.Product
 open import Relation.Binary.PropositionalEquality as PropEq hiding ([_])
 
 open import Data.Context using ([]; _∷_)
@@ -21,6 +22,8 @@ mutual
 
   -- Kind validity
   data _⊢_kd {n : ℕ} (Γ : Context n) : Kind n → Set where
+    -- TODO: [wf-type], [k-top] and [k-bot] are redundant, so we should remove
+    -- them
     wf-type : Γ ⊢ ✶ kd
     wf-intv : ∀ {A B} → Γ ⊢ty A ∈ ✶ → Γ ⊢ty B ∈ ✶ → Γ ⊢ A ∙∙ B kd
     wf-darr : ∀ {J K} → Γ ⊢ J kd → J ∷ Γ ⊢ K kd → Γ ⊢ ℿ J K kd
@@ -39,7 +42,7 @@ mutual
       Γ ⊢ty A ∈ ℿ J K → Γ ⊢ty B ∈ J → J ∷ Γ ⊢ K kd → Γ ⊢ plugKd K B kd →
       Γ ⊢ty A ∙ B ∈ plugKd K B
     k-sing : ∀{A B C} → Γ ⊢ty A ∈ B ∙∙ C → Γ ⊢ty A ∈ A ∙∙ A
-    k-sub : ∀{J K A} → Γ ⊢ty A ∈ J → Γ ⊢kd K ≤ J → Γ ⊢ty A ∈ K
+    k-sub : ∀{J K A} → Γ ⊢ty A ∈ J → Γ ⊢kd J ≤ K → Γ ⊢ty A ∈ K
 
   -- Subkinding
   data _⊢kd_≤_ {n : ℕ} (Γ : Context n) : Kind n → Kind n → Set where
@@ -71,7 +74,7 @@ mutual
     st-η₂ : ∀{A J K} →
       Γ ⊢ty A ∈ ℿ J K → Γ ⊢ty A ≤ ƛ J (weakenTy A ∙ Var zero) ∈ ℿ J K
     st-arr : ∀{A₁ A₂ B₁ B₂} →
-      Γ ⊢ty A₂ ≤ A₂ ∈ ✶ → Γ ⊢ty B₁ ≤ B₂ ∈ ✶ → Γ ⊢ty A₁ ⇒ B₁ ≤ A₂ ⇒ B₂ ∈ ✶
+      Γ ⊢ty A₁ ≤ A₂ ∈ ✶ → Γ ⊢ty B₁ ≤ B₂ ∈ ✶ → Γ ⊢ty A₁ ⇒ B₁ ≤ A₂ ⇒ B₂ ∈ ✶
     st-all : ∀{K₁ K₂ A₁ A₂} →
       Γ ⊢ty ∀' K₁ A₁ ∈ ✶ → Γ ⊢kd K₂ ≤ K₁ → K₂ ∷ Γ ⊢ty A₁ ≤ A₂ ∈ ✶ →
       Γ ⊢ty ∀' K₁ A₁ ≤ ∀' K₂ A₂ ∈ ✶
@@ -91,4 +94,46 @@ mutual
   data _⊢ty_==_∈_ {n} (Γ : Context n) : Type n → Type n → Kind n → Set where
     st-antisym : ∀{K A B} →
       Γ ⊢ty A ≤ B ∈ K → Γ ⊢ty B ≤ A ∈ K → Γ ⊢ty A == B ∈ K
+
+-- Lemmas
+
+subtype-kinding : ∀{n} {Γ : Context n} {A B K} →
+  Γ ⊢ty A ≤ B ∈ K → Γ ⊢ty A ∈ K × Γ ⊢ty B ∈ K
+subtype-kinding (st-refl x) = x , x
+subtype-kinding (st-trans A≤B B≤C) =
+  let A∈K , _ = subtype-kinding A≤B
+      _ , C∈K = subtype-kinding B≤C
+   in
+  A∈K , C∈K
+subtype-kinding {n} {Γ} {A} {⊤} {✶} (st-top A∈B∙∙C) =
+  let A-✶ : Γ ⊢ty A ∈ ✶
+      A-✶ = k-sub A∈B∙∙C (sk-intv (st-bot {!!}) (st-top {!!}))
+   in
+  A-✶ , k-top
+subtype-kinding {n} {Γ} {⊥} {A} {✶} (st-bot A∈B∙∙C) =
+  let A-✶ : Γ ⊢ty A ∈ ✶
+      A-✶ = k-sub A∈B∙∙C (sk-intv (st-bot {!!}) (st-top {!!}))
+   in
+  k-bot , A-✶
+subtype-kinding (st-β₁ A∈K B∈J A[B]∈K[B] K-isKd KB-isKd) =
+  {! !} , A[B]∈K[B]
+subtype-kinding (st-β₂ A∈K B∈J A[B]∈K[B] K-iskd KB-isKd) =
+  A[B]∈K[B] , {! !}
+subtype-kinding (st-η₁ A∈ℿJK) = {! !} , A∈ℿJK
+subtype-kinding (st-η₂ A∈ℿJK) = A∈ℿJK , {! !}
+subtype-kinding (st-arr A₁≤A₂ B₁≤B₂) =
+  let A₁-✶ , A₂-✶ = subtype-kinding A₁≤A₂
+      B₁-✶ , B₂-✶ = subtype-kinding B₁≤B₂
+   in
+  k-arr A₁-✶ B₁-✶ , k-arr A₂-✶ B₂-✶
+subtype-kinding (st-all ∀K₁A₁∈✶ K₂≤K₁ A₁≤A₂) =
+  let A₁-✶ , A₂-✶ = subtype-kinding A₁≤A₂
+   in
+  {!!}
+subtype-kinding (st-abs λJ₁A₁∈ℿJK λJ₂A₂∈ℿJK A₁≤A₂) = λJ₁A₁∈ℿJK , λJ₂A₂∈ℿJK
+subtype-kinding (st-app A₁≤A₂ B₁==B₂ B₁∈J K-isKd KB₁-isKd) = {! !}
+subtype-kinding (st-bnd₁ A∈B₁∙∙B₂) = {! !}
+subtype-kinding (st-bnd₂ A∈B₁∙∙B₂) = {! !}
+subtype-kinding (st-intv p) = {! !}
+subtype-kinding (st-sub p x) = {! !}
 

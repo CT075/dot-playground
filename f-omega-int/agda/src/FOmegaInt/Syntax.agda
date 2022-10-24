@@ -13,7 +13,6 @@ import Data.Context as C
 
 mutual
   data Kind (n : ℕ) : Set where
-    ✶ : Kind n
     _∙∙_ : Type n → Type n → Kind n
     ℿ : Kind n → Kind (suc n) → Kind n
 
@@ -26,6 +25,8 @@ mutual
     ƛ : Kind n → Type (suc n) → Type n
     _∙_ : Type n → Type n → Type n
 
+pattern ✶ = ⊥ ∙∙ ⊤
+
 module KindTypeApp {T : ℕ → Set} (l : S.Lift T Type) where
   infix 8 _/ty_
   infix 8 _/kd_
@@ -34,7 +35,6 @@ module KindTypeApp {T : ℕ → Set} (l : S.Lift T Type) where
 
   mutual
     _/kd_ : ∀ {m n : ℕ} → Kind m → S.Sub T m n → Kind n
-    ✶ /kd σ = ✶
     A ∙∙ B /kd σ = (A /ty σ) ∙∙ (B /ty σ)
     ℿ K J /kd σ = ℿ (K /kd σ) (J /kd σ ↑)
 

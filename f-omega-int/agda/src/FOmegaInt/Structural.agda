@@ -20,7 +20,6 @@ private
   injectTy (ƛ k τ) = ƛ (injectKd k) (injectTy τ)
   injectTy (τ₁ ∙ τ₂) = injectTy τ₁ ∙ injectTy τ₂
 
-  injectKd ✶ = ✶
   injectKd (τ₁ ∙∙ τ₂) = injectTy τ₁ ∙∙ injectTy τ₂
   injectKd (ℿ K J) = ℿ (injectKd K) (injectKd J)
 
@@ -37,7 +36,6 @@ liftTyUnder zero (Var x) = Var (suc x)
 liftTyUnder (suc n) (Var zero) = Var zero
 liftTyUnder (suc n) (Var (suc i)) = weakenTy (liftTyUnder n (Var i))
 
-liftKdUnder n ✶ = ✶
 liftKdUnder n (t₁ ∙∙ t₂) = liftTyUnder n t₁ ∙∙ liftTyUnder n t₂
 liftKdUnder n (ℿ K J) = ℿ (liftKdUnder n K) (liftKdUnder (suc n) J)
 
