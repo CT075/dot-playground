@@ -57,10 +57,10 @@ data _⊢_⟱[_]_ {n : ℕ} (H : Env n) : Type n → ℕ → Type n → Set wher
   eval-ƛ : ∀{K A} → H ⊢ (ƛ K A) ⟱[ 0 ] (ƛ K A)
   eval-arr : ∀{A B α β a b} →
     H ⊢ A ⟱[ a ] α → H ⊢ B ⟱[ b ] β → H ⊢ A ⇒ B ⟱[ a + b ] (α ⇒ β)
-  eval-app : ∀{A B A' τ α K a b pτ n} →
-    H ⊢ A ⟱[ a ] (ƛ K A') → H ⊢ B ⟱[ b ] τ → (H , τ [ pτ ]) ⊢ A' ⟱[ n ] α →
+  eval-app : ∀{A B A' β τ K a b βval n} →
+    H ⊢ A ⟱[ a ] (ƛ K A') → H ⊢ B ⟱[ b ] β → (H , β [ βval ]) ⊢ A' ⟱[ n ] τ →
     -- XXX: This [plugTy] makes me uncomfortable; it seems to defeat the entire
     -- purpose of using environment-based semantics over substitution semantics
     -- in the first place.
-    H ⊢ A ∙ B ⟱[ a + b + n ] (plugTy α τ)
+    H ⊢ A ∙ B ⟱[ a + b + n ] (plugTy τ β)
 

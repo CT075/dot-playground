@@ -36,7 +36,7 @@ mutual
     k-arr : ∀{A B} → Γ ⊢ty A ∈ ✶ → Γ ⊢ty B ∈ ✶ → Γ ⊢ty A ⇒ B ∈ ✶
     k-all : ∀{K A} → Γ ⊢ K kd → K ∷ Γ ⊢ty A ∈ ✶ → Γ ⊢ty ∀' K A ∈ ✶
     k-abs : ∀{J K A} →
-      Γ ⊢ J kd → J ∷ Γ ⊢ K kd → J ∷ Γ ⊢ty A ∈ K →
+      Γ ⊢ J kd → J ∷ Γ ⊢ty A ∈ K →
       Γ ⊢ty ƛ J A ∈ ℿ J K
     k-app : ∀{J K A B} →
       Γ ⊢ty A ∈ ℿ J K → Γ ⊢ty B ∈ J → J ∷ Γ ⊢ K kd → Γ ⊢ plugKd K B kd →
@@ -74,7 +74,7 @@ mutual
     st-η₂ : ∀{A J K} →
       Γ ⊢ty A ∈ ℿ J K → Γ ⊢ty A ≤ ƛ J (weakenTy A ∙ Var zero) ∈ ℿ J K
     st-arr : ∀{A₁ A₂ B₁ B₂} →
-      Γ ⊢ty A₁ ≤ A₂ ∈ ✶ → Γ ⊢ty B₁ ≤ B₂ ∈ ✶ → Γ ⊢ty A₁ ⇒ B₁ ≤ A₂ ⇒ B₂ ∈ ✶
+      Γ ⊢ty A₂ ≤ A₁ ∈ ✶ → Γ ⊢ty B₁ ≤ B₂ ∈ ✶ → Γ ⊢ty A₁ ⇒ B₁ ≤ A₂ ⇒ B₂ ∈ ✶
     st-all : ∀{K₁ K₂ A₁ A₂} →
       Γ ⊢ty ∀' K₁ A₁ ∈ ✶ → Γ ⊢kd K₂ ≤ K₁ → K₂ ∷ Γ ⊢ty A₁ ≤ A₂ ∈ ✶ →
       Γ ⊢ty ∀' K₁ A₁ ≤ ∀' K₂ A₂ ∈ ✶
@@ -97,6 +97,21 @@ mutual
 
 -- Lemmas
 
+postulate
+  intv-spec : ∀{n} {Γ : Context n} {A B C} →
+    Γ ⊢ty B ≤ A ∈ ✶ → Γ ⊢ty A ≤ C ∈ ✶ → Γ ⊢ty A ∈ B ∙∙ C
+
+  sk-trans : ∀{n} {Γ : Context n} {J K L} →
+    Γ ⊢kd J ≤ K → Γ ⊢kd K ≤ L → Γ ⊢kd J ≤ L
+
+  sk-refl : ∀{n} {Γ : Context n} {K} → Γ ⊢ K kd → Γ ⊢kd K ≤ K
+
+{-
+ℿ-inversion : ∀{n} {Γ : Context n} {A J K} → Γ ⊢ty A ∈ ℿ J K → J ∷ Γ ⊢ K kd
+ℿ-inversion (k-var Γ-is-ctx trace) = {!!}
+ℿ-inversion (k-sub A∈S S≤ℿJK) = {!!}
+ℿ-inversion (k-app a b c d) = {!!}
+
 subtype-kinding : ∀{n} {Γ : Context n} {A B K} →
   Γ ⊢ty A ≤ B ∈ K → Γ ⊢ty A ∈ K × Γ ⊢ty B ∈ K
 subtype-kinding (st-refl x) = x , x
@@ -107,20 +122,22 @@ subtype-kinding (st-trans A≤B B≤C) =
   A∈K , C∈K
 subtype-kinding {n} {Γ} {A} {⊤} {✶} (st-top A∈B∙∙C) =
   let A-✶ : Γ ⊢ty A ∈ ✶
-      A-✶ = k-sub A∈B∙∙C (sk-intv (st-bot {!!}) (st-top {!!}))
+      A-✶ = k-sub (k-sing A∈B∙∙C) (sk-intv (st-bot A∈B∙∙C) (st-top A∈B∙∙C))
    in
   A-✶ , k-top
 subtype-kinding {n} {Γ} {⊥} {A} {✶} (st-bot A∈B∙∙C) =
   let A-✶ : Γ ⊢ty A ∈ ✶
-      A-✶ = k-sub A∈B∙∙C (sk-intv (st-bot {!!}) (st-top {!!}))
+      A-✶ = k-sub (k-sing A∈B∙∙C) (sk-intv (st-bot A∈B∙∙C) (st-top A∈B∙∙C))
    in
   k-bot , A-✶
 subtype-kinding (st-β₁ A∈K B∈J A[B]∈K[B] K-isKd KB-isKd) =
-  {! !} , A[B]∈K[B]
-subtype-kinding (st-β₂ A∈K B∈J A[B]∈K[B] K-iskd KB-isKd) =
-  A[B]∈K[B] , {! !}
-subtype-kinding (st-η₁ A∈ℿJK) = {! !} , A∈ℿJK
-subtype-kinding (st-η₂ A∈ℿJK) = A∈ℿJK , {! !}
+  k-app (k-abs K-isKd A∈K) B∈J K-isKd KB-isKd , A[B]∈K[B]
+subtype-kinding (st-β₂ A∈K B∈J A[B]∈K[B] K-isKd KB-isKd) =
+  A[B]∈K[B] , k-app (k-abs K-isKd A∈K) B∈J K-isKd KB-isKd
+subtype-kinding {n} {Γ} (st-η₁ {A} {J} {K} A∈ℿJK) =
+  k-abs (ℿ-inversion A∈ℿJK) {!!} , A∈ℿJK
+subtype-kinding (st-η₂ A∈ℿJK) =
+  A∈ℿJK , k-abs (ℿ-inversion A∈ℿJK) {!!}
 subtype-kinding (st-arr A₁≤A₂ B₁≤B₂) =
   let A₁-✶ , A₂-✶ = subtype-kinding A₁≤A₂
       B₁-✶ , B₂-✶ = subtype-kinding B₁≤B₂
@@ -136,4 +153,4 @@ subtype-kinding (st-bnd₁ A∈B₁∙∙B₂) = {! !}
 subtype-kinding (st-bnd₂ A∈B₁∙∙B₂) = {! !}
 subtype-kinding (st-intv p) = {! !}
 subtype-kinding (st-sub p x) = {! !}
-
+-}
