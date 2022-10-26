@@ -1,0 +1,125 @@
+\documentclass[a4paper, 10pt]{article}
+\usepackage{amssymb, amsmath, amsthm}
+\usepackage{enumitem}
+\usepackage{mathrsfs}
+\usepackage{parskip}
+\usepackage{mathpartir}
+\usepackage{stmaryrd}
+
+\newcommand{\Fwint}{\ensuremath{F^\omega_{..}}}
+\newcommand{\Dsub}{\ensuremath{D_{<:}}}
+\newcommand{\interval}[2]{#1 .. #2}
+\newcommand{\isctx}[1]{#1\ \texttt{ctx}}
+\newcommand{\iskd}[1]{#1\ \texttt{kd}}
+\newcommand{\TyKd}{*}
+\newcommand{\KDepArr}[3]{\Pi(#1:#2).#3}
+\newcommand{\subst}[3]{#1[#2/#3]}
+\newcommand{\isval}[1]{#1\ \texttt{val}}
+\newcommand{\isenv}[1]{#1\ \texttt{env}}
+\newcommand{\stepsn}[1][]{\Downarrow^{#1}}
+\newcommand{\KDenot}[2][\Gamma]{\llbracket #2 \rrbracket_{#1}}
+\newcommand{\KEval}[2][\Gamma]{\mathscr{E}\llbracket #2 \rrbracket_{#1}}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{defn}{Definition}
+\newtheorem{lemma}{Lemma}
+
+\setlength{\parindent}{0cm}
+
+\title{\Fwint\ Types are Strongly Normalizing}
+\author{Cameron Wong}
+
+\begin{document}
+\maketitle
+
+\section{Background}
+
+My proof uses a denotation function mapping kinds to the set of normalizing
+type expressions of that kind as follows:
+
+  \begin{align*}
+    \KDenot{\TyKd} &= \{ \langle H, \tau \rangle \} \\
+    \KDenot{\interval{A}{B}} &=
+      \{ \langle H, \tau \rangle \mid
+         \Gamma \vdash A \le \tau : \TyKd,
+         \Gamma \vdash \tau \le B : \TyKd,
+      \} \\
+    \KDenot{\KDepArr{X}{J}{K}} &=
+      \{ \langle H, \lambda(X:J).A \rangle \mid
+         \forall \tau_x \in \KDenot{J} .
+           \langle H(X \mapsto \tau_x), A \rangle \in
+           \KEval[\Gamma]{\subst{K}{\tau_x}{X}}
+      \} \\
+    \KEval{K} &=
+      \{ \langle H, A \rangle \mid
+         \exists \tau .
+         H \vdash A \stepsn \tau \land
+         \langle H, \tau \rangle \in \KDenot{K}
+    \}
+\end{align*}
+
+so strong normalization can be stated as
+
+\begin{mathpar}
+  \inferrule*[right=Strong-Normalize]
+    {\Gamma \vdash A : K \and \Gamma \models H}
+    {\langle H, A \rangle \in \KEval{K}}
+\end{mathpar}
+
+which is proven by induction on the judgment $\Gamma \vdash A : K$.
+
+\section{The Issue}
+
+Consider the variable case $A = X$, with the relevant rules being
+
+\begin{mathpar}
+  \inferrule*[right=K-Var]{\isctx{\Gamma} \and \Gamma(X)=K}
+    {\Gamma \vdash X:K} \and
+  \inferrule*[right=Eval-var]{H(X) = \tau}{H \vdash X \stepsn[0] \tau}
+\end{mathpar}
+
+To show that $\langle H, X \rangle \in \KDenot{K}$, we need to show $\tau \in
+\KDenot{K}$. Even if we assume a strict call-by-value semantics, we only know
+that $\Gamma \vdash \tau : K$ and $H \vdash \isval{\tau}$.
+
+One solution would be to bake in $\KDenot{\cdot}$ to the definition of the heap
+$H$, but that feels like a mistake.
+
+So we need to prove
+
+\begin{mathpar}
+  \inferrule*[right=Denot-Spec]
+    {\Gamma \vdash \tau : K \and H \vdash \isval{\tau}}
+    {\langle H , \tau \rangle \in \KDenot{K}}
+\end{mathpar}
+
+Ideally, this would be trivial, as the entire point of $\KDenot{\cdot}$ is
+for this to be true, and it is a mostly straightforward induction on the
+judgment $H \vdash \isval{\tau}$. However, we run into an issue in the case
+that $\tau = \lambda(X:K).A$, with relevant rules/clauses:
+
+\begin{mathpar}
+  \inferrule{\phantom{}}{H \vdash \isval{\lambda(X:K).A}} \\
+  \KDenot{\KDepArr{X}{J}{K}} =
+    \{ \langle H, \lambda(X:J).A \rangle \mid
+       \forall \tau_x \in \KDenot{J} .
+         \langle H(X \mapsto \tau_x), A \rangle \in
+         \KEval[\Gamma]{\subst{K}{\tau_x}{X}}
+    \}
+\end{mathpar}
+
+The issue arises when showing that $\langle H(X \mapsto \tau_x), A \rangle \in
+\KEval{K}$. Intuitively, this is simple; we just use the main strong
+normalization proof. But now we're doing some mutual induction that I'm not
+convinced is well-founded -- we invoke \textsc{Strong-Normalize} with $A$
+(which is smaller than $\lambda(X:K).A$) and $H,X=\tau_x$ (which is larger than
+$H$). But then the proof of \textsc{Strong-Normalize} invokes
+\textsc{Denot-Spec} with an \emph{arbitrary} $\tau$ in the var case.
+
+My best guess is that I need to somehow use some measure of the heap size and
+term size combined, but I don't know if that actually works -- $\tau$ can be
+arbitrarily large, and we don't shrink the heap when we pass it back to
+\textsc{Denot-Spec}.
+
+\end{document}
+
