@@ -41,29 +41,43 @@ mutual
       eval : H ⊢ A ⟱[ gas ] τ
       denot : ⟨ H , τ ⟩∈⟦ K ⟧[ Γ ]
 
+denot-val : ∀{n} {Γ : Context n} {H : Env n} {τ : Type n} {K : Kind n} →
+  ⟨ H , τ ⟩∈⟦ K ⟧[ Γ ] → H ⊢ τ val
+denot-val (denot-typ _ τ-is-val) = τ-is-val
+denot-val (denot-intv lower upper τ-is-val) = τ-is-val
+denot-val (denot-abs _ τ-is-val) = v-abs
+
+denot-kind : ∀{n} {Γ : Context n} {H : Env n} {τ : Type n} {K : Kind n} →
+  ⟨ H , τ ⟩∈⟦ K ⟧[ Γ ] → Γ ⊢ty τ ∈ K
+denot-kind (denot-typ τ∈✶ τval) = τ∈✶
+denot-kind (denot-intv lower upper τ-is-val) = intv-spec lower upper
+denot-kind (denot-abs {J} {J'} {K} J≤J' f) =
+  k-sub {!!} (sk-darr {!!} J≤J' (sk-refl {!!}))
+
 data _⊨_ : ∀{n} → Context n → Env n → Set where
   c-emp : [] ⊨ ∅
   -- I don't really understand why it can't infer the [suc n] on the output
   -- here
   c-cons : ∀{n Γ H K τ p} →
-    Γ ⊢ty τ ∈ K → _⊨_ {n} Γ H → _⊨_ {suc n} (K ∷ Γ) (H , τ [ p ])
+    ⟨ H , τ ⟩∈⟦ K ⟧[ Γ ] → _⊨_ {n} Γ H → _⊨_ {suc n} (K ∷ Γ) (H , τ [ p ])
 
 record Lookup {n : ℕ}
     (Γ : Context n) (H : Env n) (K : Kind n) (v : Fin n) : Set where
   constructor L
   field
     τ : Type n
-    isVal : H ⊢ τ val
-    kinding : Γ ⊢ty τ ∈ K
-    proof : lookup H v ≡ V τ isVal
+    denot : ⟨ H , τ ⟩∈⟦ K ⟧[ Γ ]
+    proof : lookup H v ≡ V τ (denot-val denot)
 
 consistentEnv : ∀{n} {Γ : Context n} {H : Env n} {K : Kind n} →
   Γ ⊨ H → {v : Fin n} → lookupKd Γ v ≡ K → Lookup Γ H K v
 consistentEnv {zero} {[]} {∅} {_} c-emp {()}
 consistentEnv {suc n} {K ∷ _} {_ , τ [ p ]} {_} (c-cons k _) {zero} refl =
-  L (weakenTy τ) (weaken-isVal p τ p) (weaken-kinding k) refl
+  L (weakenTy τ) {! (weaken-isVal p τ p) (weaken-kinding (denot-kind k)) !} refl
 consistentEnv {suc n} {K ∷ Γ} {H , t [ pt ]} {_} (c-cons _ p) {suc i} refl =
-  let L τ isVal kinding proof = consistentEnv {n} {Γ} {H} p {i} refl
+  let L τ τ∈⟦K⟧ proof = consistentEnv {n} {Γ} {H} p {i} refl
+
+      isVal = denot-val τ∈⟦K⟧
 
       open ≡-Reasoning
       proof' : lookup (H , t [ pt ]) (suc i) ≡ weakenVal (V τ isVal) t pt
@@ -73,45 +87,7 @@ consistentEnv {suc n} {K ∷ Γ} {H , t [ pt ]} {_} (c-cons _ p) {suc i} refl =
         weakenVal (V τ isVal) t pt
         ∎
    in
-  L (weakenTy τ) (weaken-isVal isVal t pt) (weaken-kinding kinding) proof'
-
-kinding-rev-preservation : ∀{n gas}
-  {Γ : Context n} {H : Env n} {A τ : Type n} {K : Kind n} →
-  Γ ⊢ty τ ∈ K → Γ ⊨ H → H ⊢ A ⟱[ gas ] τ → Γ ⊢ty A ∈ K
-kinding-rev-preservation τ∈k cs (eval-var trace) = {!!}
-kinding-rev-preservation τ∈k cs eval-⊤ = τ∈k
-kinding-rev-preservation τ∈k cs eval-⊥ = τ∈k
-kinding-rev-preservation τ∈k cs eval-∀' = τ∈k
-kinding-rev-preservation τ∈k cs eval-ƛ = τ∈k
-kinding-rev-preservation (k-arr α∈✶ β∈✶) cs (eval-arr A⟱α B⟱β) =
-  let A∈✶ = kinding-rev-preservation α∈✶ cs A⟱α
-      B∈✶ = kinding-rev-preservation β∈✶ cs B⟱β
-   in
-  k-arr A∈✶ B∈✶
-kinding-rev-preservation (k-sing α⇒β∈L∙∙U) cs (eval-arr A⟱α B⟱β) =
-  let x = kinding-rev-preservation α⇒β∈L∙∙U cs (eval-arr A⟱α B⟱β)
-   in
-  {!!}
-kinding-rev-preservation (k-sub τ∈k x) cs (eval-arr A⟱α B⟱β) = {! !}
-kinding-rev-preservation τ∈k cs (eval-app pA pB pAB) = {! !}
-
-denot-val : ∀{n} {Γ : Context n} {H : Env n} {τ : Type n} {K : Kind n} →
-  ⟨ H , τ ⟩∈⟦ K ⟧[ Γ ] → H ⊢ τ val
-denot-val (denot-typ _ τ-is-val) = τ-is-val
-denot-val (denot-intv lower upper τ-is-val) = τ-is-val
-denot-val (denot-abs _ τ-is-val) = v-abs
-
-denot-kind-ℰ : ∀{n} {Γ : Context n} {H : Env n} {A : Type n} {K : Kind n} →
-  ⟨ H , A ⟩∈ℰ⟦ K ⟧[ Γ ] → Γ ⊨ H → Γ ⊢ty A ∈ K
-denot-kind : ∀{n} {Γ : Context n} {H : Env n} {τ : Type n} {K : Kind n} →
-  ⟨ H , τ ⟩∈⟦ K ⟧[ Γ ] → Γ ⊨ H → Γ ⊢ty τ ∈ K
-
-denot-kind-ℰ (N gas τ eval denot) cs =
-  kinding-rev-preservation (denot-kind denot cs) cs eval
-
-denot-kind (denot-typ pk x) cs = pk
-denot-kind (denot-intv lower upper τ-is-val) cs = intv-spec lower upper
-denot-kind (denot-abs J≤J' f) cs = {! !}
+  L (weakenTy τ) {! (weaken-isVal isVal t pt) (weaken-kinding kinding) !} proof'
 
 record FunctionInversion {n}
     (Γ : Context n) (H : Env n) (J : Kind n)
@@ -128,7 +104,7 @@ record FunctionInversion {n}
 
 functionInversion : ∀{n} {Γ : Context n} {H : Env n} {τ J K} →
   ⟨ H , τ ⟩∈⟦ ℿ J K ⟧[ Γ ] → Γ ⊨ H → FunctionInversion Γ H J K τ
-functionInversion (denot-abs {J} {J'} {K} {H} {body} {Γ} J≤J' f) cs =
+functionInversion (denot-abs {J} {J'} {K} {H} {body} {Γ} J≤J' f) Γ⊨H =
   F body J' J≤J' refl f
 
 rewriteInversionStep : ∀{n gas} {Γ : Context n} {H : Env n} {A τ J body} →
@@ -157,6 +133,9 @@ semanticWidening {n} {Γ} {_}
    in
   denot-abs (sk-trans J₂≤J₁ J₁≤J₁') f'
 
+heapValue : ∀{n} {τ K} (Γ : Context n) (H : Env n) (i : Fin n) → Set
+heapValue {_} {τ} {K} Γ H i = Val.this (lookup H i) ≡ τ → ⟨ H , τ ⟩∈⟦ K ⟧[ Γ ]
+
 -- Technically, the [H ⊢ τ val] premise in [val-denot] is implied by the
 -- consistent environment premise. However, it simplifies the proofs a lot to
 -- pass it explicitly.
@@ -174,58 +153,60 @@ val-denot k-bot _ = denot-typ k-bot
 val-denot (k-arr τ₁ τ₂) _ (v-arr p₁ p₂) = denot-typ (k-arr τ₁ τ₂) (v-arr p₁ p₂)
 val-denot (k-all x p) _ = denot-typ (k-all x p)
 val-denot {n} {Γ} {H} {ƛ J A} {ℿ J K}
-  (k-abs J-is-kd K-is-kd) cs v-abs =
+  (k-abs J-is-kd K-is-kd) Γ⊨H v-abs =
   let body-normalizes :
         (τₓ : Type n) → (px : H ⊢ τₓ val) → Γ ⊢ty τₓ ∈ J →
         ⟨ H , τₓ [ px ] , A ⟩∈ℰ⟦ K ⟧[ J ∷ Γ ]
-      body-normalizes τₓ px τₓ-is-J =
-        -- We run into issues with the termination checker here. We need some
-        -- kind of notion of "size" such that ⟨ (H, τₓ), A ⟩ is smaller than
-        -- ⟨ H, ƛ J A ⟩.
+      body-normalizes τₓ τₓval τₓ∈J =
         typesNormalize
           -- TODO: need a substitution lemma here
-          {!!}
-          (c-cons τₓ-is-J cs)
+          {! Γ ⊢ty body[τₓ] ∈ J !}
+          (c-cons (val-denot τₓ∈J Γ⊨H τₓval) Γ⊨H)
    in
   denot-abs (sk-refl J-is-kd) body-normalizes
 val-denot (k-app p p₁ x x₁) _ ()
 val-denot (k-sing A-is-bounded) _ =
   denot-intv (st-bnd₁ (k-sing A-is-bounded)) (st-bnd₂ (k-sing A-is-bounded))
-val-denot (k-sub A∈J J≤K) cs A-val =
-  {! semanticWidening J≤K (val-denot A∈J cs A-val) !}
+val-denot (k-sub A∈J J≤K) Γ⊨H A-val =
+  semanticWidening J≤K (val-denot A∈J Γ⊨H A-val)
 
-typesNormalize (k-var Γ-is-ctx trace) cs =
-  let L τ isVal kinding proof = consistentEnv cs trace
+typesNormalize (k-var Γ-is-ctx trace) Γ⊨H =
+  let L τ τ∈⟦K⟧ τ∈H = consistentEnv Γ⊨H trace
    in
-  N 0 τ (eval-var proof) (val-denot kinding cs isVal)
+  -- We run into issues with the termination checker here. τ is not a subterm
+  -- of (Var n) and can be arbitrarily large. The problematic case is when
+  -- [τ] is [ƛ J (Var m)], as we then re-recurse on [typesNormalize] to
+  -- generate the witness for [denot-abs].
+  N 0 τ (eval-var τ∈H) τ∈⟦K⟧
 typesNormalize k-top _ = N 0 ⊤ eval-⊤ (denot-typ k-top v-top)
 typesNormalize k-bot _ = N 0 ⊥ eval-⊥ (denot-typ k-bot v-bot)
-typesNormalize (k-arr A∈✶ B∈✶) cs =
-  let N a α evalA denotA = typesNormalize A∈✶ cs
-      N b β evalB denotB = typesNormalize B∈✶ cs
+typesNormalize (k-arr A∈✶ B∈✶) Γ⊨H =
+  let N a α evalA denotA = typesNormalize A∈✶ Γ⊨H
+      N b β evalB denotB = typesNormalize B∈✶ Γ⊨H
       varr = v-arr (⟱-spec evalA) (⟱-spec evalB)
    in
   N (a + b)
     (α ⇒ β)
     (eval-arr evalA evalB)
-    (denot-typ (k-arr (denot-kind denotA cs) (denot-kind denotB cs)) varr)
+    (denot-typ (k-arr {!!} (denot-kind denotB)) varr)
 typesNormalize (k-all {K} {A} pK pA) _ =
   N 0 (∀' K A) eval-∀' (denot-typ (k-all pK pA) v-all)
-typesNormalize {n} {Γ} {H} (k-abs {J} {K} {A} J-isKd A∈K) cs =
+typesNormalize {n} {Γ} {H} (k-abs {J} {K} {A} J-isKd A∈K) Γ⊨H =
   let d-inner : (τ : Type n) → (vτ : H ⊢ τ val) → Γ ⊢ty τ ∈ J →
         ⟨ (H , τ [ vτ ]) , A ⟩∈ℰ⟦ K ⟧[ J ∷ Γ ]
-      d-inner τ vτ pτ = typesNormalize {suc n} A∈K (c-cons pτ cs)
+      d-inner τ τval τ∈J =
+        typesNormalize {suc n} A∈K (c-cons (val-denot τ∈J Γ⊨H τval) Γ⊨H)
 
       denot = denot-abs (sk-refl J-isKd) d-inner
    in
   N 0 (ƛ J A) eval-ƛ denot
 typesNormalize {_} {Γ} {H}
-    (k-app {J} {K} {A} {B} A∈ℿJK B∈J K-isKd KB-isKd) cs =
-  let N a α A⟱α α∈⟦ℿJK⟧ = typesNormalize A∈ℿJK cs
-      F body _ _ expand proof = functionInversion α∈⟦ℿJK⟧ cs
-      N b β B⟱β β∈⟦J⟧ = typesNormalize B∈J cs
+    (k-app {J} {K} {A} {B} A∈ℿJK B∈J K-isKd KB-isKd) Γ⊨H =
+  let N a α A⟱α α∈⟦ℿJK⟧ = typesNormalize A∈ℿJK Γ⊨H
+      F body _ _ expand proof = functionInversion α∈⟦ℿJK⟧ Γ⊨H
+      N b β B⟱β β∈⟦J⟧ = typesNormalize B∈J Γ⊨H
       βval = denot-val β∈⟦J⟧
-      N n τ α∙β⟱τ τ∈⟦KB⟧ = proof β (denot-val β∈⟦J⟧) (denot-kind β∈⟦J⟧ cs)
+      N n τ α∙β⟱τ τ∈⟦KB⟧ = proof β (denot-val β∈⟦J⟧) (denot-kind β∈⟦J⟧)
    in
   N (a + b + n)
     (plugTy τ β)
@@ -234,12 +215,12 @@ typesNormalize {_} {Γ} {H}
       B⟱β
       α∙β⟱τ)
     {! τ∈⟦KB⟧ !}
-typesNormalize (k-sing p) cs =
-  let N gas τ eval denot = typesNormalize p cs
+typesNormalize (k-sing p) Γ⊨H =
+  let N gas τ eval denot = typesNormalize p Γ⊨H
    in
   -- TODO: need to show that A ⟱ τ implies τ ≤ A
   N gas τ eval (denot-intv {!!} {!!} (⟱-spec eval))
-typesNormalize (k-sub A∈J J≤K) cs =
-  let N gas τ A⟱τ τ∈⟦J⟧ = typesNormalize A∈J cs
+typesNormalize (k-sub A∈J J≤K) Γ⊨H =
+  let N gas τ A⟱τ τ∈⟦J⟧ = typesNormalize A∈J Γ⊨H
    in
   N gas τ A⟱τ (semanticWidening J≤K τ∈⟦J⟧)
