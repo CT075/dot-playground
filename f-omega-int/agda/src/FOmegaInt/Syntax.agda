@@ -4,6 +4,7 @@ open import Data.Fin using (Fin; suc; zero)
 import Data.Fin.Substitution as S
 open import Data.Fin.Substitution.Lemmas
 open import Data.Nat using (ℕ; suc; zero; _+_)
+open import Data.Bool using (if_then_else_)
 import Data.Vec as Vec
 
 import Data.Context as C
@@ -12,7 +13,6 @@ import Data.Context as C
 
 mutual
   data Kind (n : ℕ) : Set where
-    ✶ : Kind n
     _∙∙_ : Type n → Type n → Kind n
     ℿ : Kind n → Kind (suc n) → Kind n
 
@@ -25,6 +25,8 @@ mutual
     ƛ : Kind n → Type (suc n) → Type n
     _∙_ : Type n → Type n → Type n
 
+pattern ✶ = ⊥ ∙∙ ⊤
+
 module KindTypeApp {T : ℕ → Set} (l : S.Lift T Type) where
   infix 8 _/ty_
   infix 8 _/kd_
@@ -33,7 +35,6 @@ module KindTypeApp {T : ℕ → Set} (l : S.Lift T Type) where
 
   mutual
     _/kd_ : ∀ {m n : ℕ} → Kind m → S.Sub T m n → Kind n
-    ✶ /kd σ = ✶
     A ∙∙ B /kd σ = (A /ty σ) ∙∙ (B /ty σ)
     ℿ K J /kd σ = ℿ (K /kd σ) (J /kd σ ↑)
 
@@ -92,7 +93,7 @@ module Ops where
 
   open S.Application tyApp public using () renaming (_/_ to _/Ty_)
   open S.Application kdApp public using () renaming (_/_ to _/Kd_)
-  open S.Lift typeLift using (sub)
+  open S.Lift typeLift public using (sub; _↑)
 
   plugTy : ∀{n : ℕ} → Type (suc n) → Type n → Type n
   plugTy t τ = t /Ty (sub τ)
@@ -100,7 +101,17 @@ module Ops where
   plugKd : ∀{n : ℕ} → Kind (suc n) → Type n → Kind n
   plugKd k τ = k /Kd (sub τ)
 
-open Ops using (weakenTy; weakenKd; plugTy; plugKd) public
+open Ops using
+  ( weakenTy
+  ; weakenTy*
+  ; weakenKd
+  ; plugTy
+  ; plugKd
+  ; _/Ty_
+  ; _/Kd_
+  ; sub
+  ; _↑
+  ) public
 
 module Context where
   open C hiding (Ctx)
@@ -114,4 +125,4 @@ module Context where
 
   open C.WeakenOps Kind weakenOps public
 
-open Context using (lookup) renaming (Ctx to Context) public
+open Context using (lookup; insertUnder) renaming (Ctx to Context) public
