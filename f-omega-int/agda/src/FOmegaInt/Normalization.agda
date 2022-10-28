@@ -23,9 +23,6 @@ mutual
     denot-abs : ∀{J J' : Kind n} {K : Kind (suc n)} {H : Env n}
         {A : Type (suc n)} {Γ : Context n} →
       Γ ⊢kd J ≤ J' →
-      -- The on-paper rules use τₓ ∈ ⟦J⟧, but this breaks the positivity
-      -- checker. Thankfully, we can use the regular kinding rules (via Γ) as a
-      -- surrogate.
       ( (τₓ : Type n) → (px : H ⊢ τₓ val) → Γ ⊢ty τₓ ∈ J
       → ⟨ H , τₓ [ px ] , A ⟩∈ℰ⟦ K ⟧[ J ∷ Γ ]
       ) →
@@ -195,7 +192,7 @@ typesNormalize {n} {Γ} {H} (k-abs {J} {K} {A} J-isKd A∈K) Γ⊨H =
   let d-inner : (τ : Type n) → (vτ : H ⊢ τ val) → Γ ⊢ty τ ∈ J →
         ⟨ (H , τ [ vτ ]) , A ⟩∈ℰ⟦ K ⟧[ J ∷ Γ ]
       d-inner τ τval τ∈J =
-        typesNormalize {suc n} A∈K (c-cons (val-denot τ∈J Γ⊨H τval) Γ⊨H)
+        typesNormalize {suc n} A∈K (c-cons ({! val-denot τ∈J Γ⊨H τval !}) Γ⊨H)
 
       denot = denot-abs (sk-refl J-isKd) d-inner
    in
