@@ -2,6 +2,9 @@ module FOmegaInt.Normalization where
 
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Fin using (Fin; zero; suc)
+open import Data.Product
+open import Data.Unit renaming (⊤ to Unit)
+open import Data.Empty renaming (⊥ to Void)
 open import Relation.Binary.PropositionalEquality as PropEq hiding ([_])
 
 open import Data.Context
@@ -10,22 +13,59 @@ open import FOmegaInt.Typing
 open import FOmegaInt.Structural
 open import FOmegaInt.Reduction
 
--- The main proof is at the bottom, the function [typesNormalize]!
+{-
+Morally, we'd like to define our relation like this:
+
+  module NotStrictlyPositive where
+    mutual
+      data ⟨_,_⟩∈⟦_⟧[_] {n : ℕ} : Env n → Type n → Kind n → Context n → Set where
+        denot-typ : ∀{H v Γ} → Γ ⊢ty v ∈ ✶ → H ⊢ v val → ⟨ H , v ⟩∈⟦ ✶ ⟧[ Γ ]
+        denot-intv : ∀{A B H v Γ} →
+          Γ ⊢ty A ≤ v ∈ ✶ → Γ ⊢ty v ≤ B ∈ ✶ → H ⊢ v val →
+          ⟨ H , v ⟩∈⟦ A ∙∙ B ⟧[ Γ ]
+        denot-abs : ∀{J J' : Kind n} {K : Kind (suc n)} {H : Env n}
+            {A : Type (suc n)} {Γ : Context n} →
+          Γ ⊢kd J ≤ J' →
+          ( (τₓ : Type n) → (px : H ⊢ τₓ val) → ⟨ H , τₓ ⟩∈⟦ J ⟧
+          → ⟨ H , τₓ [ px ] , A ⟩∈ℰ⟦ K ⟧[ J ∷ Γ ]
+          ) →
+          ⟨ H , ƛ J' A ⟩∈⟦ ℿ J K ⟧[ Γ ]
+
+However, this type isn't strictly positive (see the ⟨_,_⟩∈⟦_⟧ as a function
+input in the denot-abs constructor), so we need to use structural recursion to
+define this datatype.
+-}
 
 mutual
-  -- XXX: It worries me a little that we need to rely so much on parameterizing
-  -- on the typing context Γ.
+  norm-stmt : ∀{n} → Context n → Env n → Type n → Kind n → ℕ × Type n → Set
+  norm-stmt Γ H A K (gas , τ) = (H ⊢ A ⟱[ gas ] τ) × (⟨ H , τ ⟩∈'⟦ K ⟧[ Γ ])
+
+  ⟨_,_⟩∈'⟦_⟧[_] : ∀{n : ℕ} → Env n → Type n → Kind n → Context n → Set
+  ⟨ H , v ⟩∈'⟦ A ∙∙ B ⟧[ Γ ] = H ⊢ v val × Γ ⊢ty A ≤ v ∈ ✶ × Γ ⊢ty v ≤ B ∈ ✶
+  ⟨ H , ƛ J' A ⟩∈'⟦ ℿ J K ⟧[ Γ ] =
+    Γ ⊢kd J ≤ J' ×
+    (∀ τₓ τₓval → ⟨ H , τₓ ⟩∈'⟦ J ⟧[ Γ ] →
+      ⟨ (H , τₓ [ τₓval ]) , A ⟩∈'ℰ⟦ K ⟧[ J ∷ Γ ])
+  ⟨ H , _ ⟩∈'⟦ ℿ J K ⟧[ Γ ] = Void
+
+  ⟨_,_⟩∈'ℰ⟦_⟧[_] : ∀{n : ℕ} (H : Env n) (A : Type n) (K : Kind n) (Γ : Context n) → Set
+  ⟨_,_⟩∈'ℰ⟦_⟧[_] {n} H A K Γ =
+    Σ[ W ∈ (ℕ × Type n) ] (norm-stmt Γ H A K W)
+
+mutual
+  -- While the recursive functions above are actually sufficient for our
+  -- purposes, they're a pain to pattern match on, so we provide an
+  -- inductive-recursive view here. Notice the use of ∈' (instead of just ∈) in
+  -- the denot-abs constructor.
   data ⟨_,_⟩∈⟦_⟧[_] {n : ℕ} : Env n → Type n → Kind n → Context n → Set where
-    denot-typ : ∀{H v Γ} → Γ ⊢ty v ∈ ✶ → H ⊢ v val → ⟨ H , v ⟩∈⟦ ✶ ⟧[ Γ ]
     denot-intv : ∀{A B H v Γ} →
-      Γ ⊢ty A ≤ v ∈ ✶ → Γ ⊢ty v ≤ B ∈ ✶ → H ⊢ v val →
+      H ⊢ v val → Γ ⊢ty A ≤ v ∈ ✶ → Γ ⊢ty v ≤ B ∈ ✶ →
       ⟨ H , v ⟩∈⟦ A ∙∙ B ⟧[ Γ ]
     denot-abs : ∀{J J' : Kind n} {K : Kind (suc n)} {H : Env n}
         {A : Type (suc n)} {Γ : Context n} →
       Γ ⊢kd J ≤ J' →
-      ( (τₓ : Type n) → (px : H ⊢ τₓ val) → Γ ⊢ty τₓ ∈ J
-      → ⟨ H , τₓ [ px ] , A ⟩∈ℰ⟦ K ⟧[ J ∷ Γ ]
-      ) →
+      ( ∀ τₓ τₓval → ⟨ H , τₓ ⟩∈'⟦ J ⟧[ Γ ] →
+          ⟨ (H , τₓ [ τₓval ]) , A ⟩∈ℰ⟦ K ⟧[ J ∷ Γ ]) →
       ⟨ H , ƛ J' A ⟩∈⟦ ℿ J K ⟧[ Γ ]
 
   record ⟨_,_⟩∈ℰ⟦_⟧[_] {n : ℕ}
@@ -38,18 +78,72 @@ mutual
       eval : H ⊢ A ⟱[ gas ] τ
       denot : ⟨ H , τ ⟩∈⟦ K ⟧[ Γ ]
 
+mutual
+  -- Proof that the recursive view implies the inductive view
+  denot-rec-ind-v :
+    ∀{n} {Γ : Context n} {H : Env n} {τ : Type n} {K : Kind n} →
+    ⟨ H , τ ⟩∈'⟦ K ⟧[ Γ ] → ⟨ H , τ ⟩∈⟦ K ⟧[ Γ ]
+  denot-rec-ind-v {_} {_} {_} {_} {A ∙∙ B} (τ-val , A≤τ , τ≤B) =
+    denot-intv τ-val A≤τ τ≤B
+  denot-rec-ind-v {n} {Γ} {H} {ƛ J' A} {ℿ J K} (J≤J' , f) =
+    let f' : (τₓ : Type n) → (τₓval : H ⊢ τₓ val) → ⟨ H , τₓ ⟩∈'⟦ J ⟧[ Γ ] →
+               ⟨ (H , τₓ [ τₓval ]) , A ⟩∈ℰ⟦ K ⟧[ J ∷ Γ ]
+        f' τₓ τₓval p = denot-rec-ind-e (f τₓ τₓval p)
+     in
+    denot-abs J≤J' f'
+
+  denot-rec-ind-e :
+    ∀{n} {Γ : Context n} {H : Env n} {τ : Type n} {K : Kind n} →
+    ⟨ H , τ ⟩∈'ℰ⟦ K ⟧[ Γ ] → ⟨ H , τ ⟩∈ℰ⟦ K ⟧[ Γ ]
+  denot-rec-ind-e ((gas , τ) , (eval , denot)) =
+    N gas τ eval (denot-rec-ind-v denot)
+
+mutual
+  -- Proof that the inductive view implies the recursive view
+  denot-ind-rec-v :
+    ∀{n} {Γ : Context n} {H : Env n} {τ : Type n} {K : Kind n} →
+    ⟨ H , τ ⟩∈⟦ K ⟧[ Γ ] → ⟨ H , τ ⟩∈'⟦ K ⟧[ Γ ]
+  denot-ind-rec-v (denot-intv τ-val A≤τ τ≤B) = (τ-val , A≤τ , τ≤B)
+  denot-ind-rec-v {n} {Γ} {H} {ƛ J' A} {ℿ J K} (denot-abs J≤J' f') =
+    let f : ∀ τₓ τₓval → ⟨ H , τₓ ⟩∈'⟦ J ⟧[ Γ ] →
+          ⟨ (H , τₓ [ τₓval ]) , A ⟩∈'ℰ⟦ K ⟧[ J ∷ Γ ]
+        f τₓ τₓval p = denot-ind-rec-e (f' τₓ τₓval p)
+     in
+    (J≤J' , f)
+
+  denot-ind-rec-e :
+    ∀{n} {Γ : Context n} {H : Env n} {τ : Type n} {K : Kind n} →
+    ⟨ H , τ ⟩∈ℰ⟦ K ⟧[ Γ ] → ⟨ H , τ ⟩∈'ℰ⟦ K ⟧[ Γ ]
+  denot-ind-rec-e (N gas τ eval denot) =
+    ((gas , τ) , (eval , denot-ind-rec-v denot))
+
 denot-val : ∀{n} {Γ : Context n} {H : Env n} {τ : Type n} {K : Kind n} →
   ⟨ H , τ ⟩∈⟦ K ⟧[ Γ ] → H ⊢ τ val
-denot-val (denot-typ _ τ-is-val) = τ-is-val
-denot-val (denot-intv lower upper τ-is-val) = τ-is-val
-denot-val (denot-abs _ τ-is-val) = v-abs
+denot-val (denot-intv τ-val lower upper) = τ-val
+denot-val (denot-abs _ _) = v-abs
 
 denot-kind : ∀{n} {Γ : Context n} {H : Env n} {τ : Type n} {K : Kind n} →
   ⟨ H , τ ⟩∈⟦ K ⟧[ Γ ] → Γ ⊢ty τ ∈ K
-denot-kind (denot-typ τ∈✶ τval) = τ∈✶
-denot-kind (denot-intv lower upper τ-is-val) = intv-spec lower upper
+denot-kind (denot-intv τ-val lower upper) = intv-spec lower upper
 denot-kind (denot-abs {J} {J'} {K} J≤J' f) =
   k-sub {!!} (sk-darr {!!} J≤J' (sk-refl {!!}))
+
+-- TODO: The ordering of arguments here is a huge mess.
+postulate
+  weaken-denot : ∀{n} {Γ : Context n} {H : Env n} {τ τ' τ'val} {K} K' →
+    ⟨ H , τ ⟩∈⟦ K ⟧[ Γ ] →
+    ⟨ (H , τ' [ τ'val ]) , weakenTy τ ⟩∈⟦ weakenKd K ⟧[ K' ∷ Γ ]
+  {-
+  weaken-denot {n} {Γ} {H} {τ} {τ'} {τ'val} {K} {K'} (denot-intv τval A≤τ τ≤B) =
+    denot-intv (weaken-isVal τval τ' τ'val) (weaken-st A≤τ) (weaken-st τ≤B)
+  -}
+
+  weaken-isVal≡denot-val○weaken-denot :
+    ∀{n} {Γ : Context n} {H : Env n} {τ' τ'val}
+      (τ : Type n) (τval : H ⊢ τ val) K K' τ∈⟦K⟧
+    →
+        weaken-isVal τval τ' τ'val
+      ≡ denot-val (weaken-denot {n} {Γ} {H} {τ} {τ'} {τ'val} {K} K' τ∈⟦K⟧)
 
 data _⊨_ : ∀{n} → Context n → Env n → Set where
   c-emp : [] ⊨ ∅
@@ -69,22 +163,52 @@ record Lookup {n : ℕ}
 consistentEnv : ∀{n} {Γ : Context n} {H : Env n} {K : Kind n} →
   Γ ⊨ H → {v : Fin n} → lookupKd Γ v ≡ K → Lookup Γ H K v
 consistentEnv {zero} {[]} {∅} {_} c-emp {()}
-consistentEnv {suc n} {K ∷ _} {_ , τ [ p ]} {_} (c-cons k _) {zero} refl =
-  L (weakenTy τ) {! (weaken-isVal p τ p) (weaken-kinding (denot-kind k)) !} refl
-consistentEnv {suc n} {K ∷ Γ} {H , t [ pt ]} {_} (c-cons _ p) {suc i} refl =
-  let L τ τ∈⟦K⟧ proof = consistentEnv {n} {Γ} {H} p {i} refl
+consistentEnv {suc n} {K ∷ Γ} {H , τ [ τval ]} {_} (c-cons τ∈⟦K⟧ _) {zero} refl =
+    L (weakenTy τ) (weaken-denot K τ∈⟦K⟧) lookup-refl
+  where
+    open ≡-Reasoning
 
-      isVal = denot-val τ∈⟦K⟧
+    lookup-refl :
+        lookup (H , τ [ τval ]) zero
+      ≡ V (weakenTy τ) (denot-val (weaken-denot K τ∈⟦K⟧))
+    lookup-refl = begin
+        lookup (H , τ [ τval ]) zero
+      ≡⟨ refl ⟩
+        weakenVal (V τ τval) τ τval
+      ≡⟨ refl ⟩
+        V (weakenTy τ) (weaken-isVal τval τ τval)
+      ≡⟨ cong
+           (V (weakenTy τ))
+           (weaken-isVal≡denot-val○weaken-denot τ τval K K τ∈⟦K⟧)
+       ⟩
+        V (weakenTy τ) (denot-val (weaken-denot K τ∈⟦K⟧))
+      ∎
+consistentEnv {suc n} {K ∷ Γ} {H , t [ tval ]} {_} (c-cons _ p) {suc i} refl =
+  let L τ τ∈⟦K'⟧ subproof = consistentEnv {n} {Γ} {H} p {i} refl
+
+      τval = denot-val τ∈⟦K'⟧
 
       open ≡-Reasoning
-      proof' : lookup (H , t [ pt ]) (suc i) ≡ weakenVal (V τ isVal) t pt
-      proof' = begin
-        lookup (H , t [ pt ]) (suc i) ≡⟨ refl ⟩
-        weakenVal (lookup H i) t pt ≡⟨ cong (λ tm → weakenVal tm t pt) proof ⟩
-        weakenVal (V τ isVal) t pt
+      lookup-recursive :
+          lookup (H , t [ tval ]) (suc i)
+        ≡ V (weakenTy τ) (denot-val (weaken-denot K τ∈⟦K'⟧))
+      lookup-recursive = begin
+          lookup (H , t [ tval ]) (suc i)
+        ≡⟨ refl ⟩
+          weakenVal (lookup H i) t tval
+        ≡⟨ cong (λ tm → weakenVal tm t tval) subproof ⟩
+          weakenVal (V τ τval) t tval
+        ≡⟨ refl ⟩
+          V (weakenTy τ) (weaken-isVal τval t tval)
+        ≡⟨ cong
+             (V (weakenTy τ))
+             (weaken-isVal≡denot-val○weaken-denot
+               τ τval (lookupKd Γ i) K τ∈⟦K'⟧)
+         ⟩
+          V (weakenTy τ) (denot-val (weaken-denot K τ∈⟦K'⟧))
         ∎
    in
-  L (weakenTy τ) {! (weaken-isVal isVal t pt) (weaken-kinding kinding) !} proof'
+  L (weakenTy τ) (weaken-denot K τ∈⟦K'⟧) lookup-recursive
 
 record FunctionInversion {n}
     (Γ : Context n) (H : Env n) (J : Kind n)
@@ -96,8 +220,8 @@ record FunctionInversion {n}
     realJ : Kind n
     realJ≤J : Γ ⊢kd J ≤ realJ
     expand : τ ≡ ƛ realJ body
-    proof : (τₓ : Type n) → (px : H ⊢ τₓ val) → Γ ⊢ty τₓ ∈ J
-          → ⟨ (H , τₓ [ px ]) , body ⟩∈ℰ⟦ K ⟧[ J ∷ Γ ]
+    proof : ( (τₓ : Type n) → (px : H ⊢ τₓ val) → ⟨ H , τₓ ⟩∈'⟦ J ⟧[ Γ ]
+            → ⟨ H , τₓ [ px ] , body ⟩∈ℰ⟦ K ⟧[ J ∷ Γ ])
 
 functionInversion : ∀{n} {Γ : Context n} {H : Env n} {τ J K} →
   ⟨ H , τ ⟩∈⟦ ℿ J K ⟧[ Γ ] → Γ ⊨ H → FunctionInversion Γ H J K τ
@@ -110,29 +234,23 @@ rewriteInversionStep eq A⟱τ rewrite eq = A⟱τ
 
 semanticWidening : ∀{n} {Γ : Context n} {K₁ K₂} →
   Γ ⊢kd K₁ ≤ K₂ → ∀{H τ} → ⟨ H , τ ⟩∈⟦ K₁ ⟧[ Γ ] → ⟨ H , τ ⟩∈⟦ K₂ ⟧[ Γ ]
-semanticWidening (sk-intv A₂≤A₁ B₁≤B₂) (denot-intv A₁≤τ τ≤B₁ vval) =
-  denot-intv (st-trans A₂≤A₁ A₁≤τ) (st-trans τ≤B₁ B₁≤B₂) vval
-semanticWidening (sk-intv A₂≤⊥ ⊤≤B₂) (denot-typ τ∈✶ vval) =
-  let A₂≤τ = st-trans A₂≤⊥ (st-bnd₁ τ∈✶)
-      τ≤B₂ = st-trans (st-bnd₂ τ∈✶) ⊤≤B₂
-   in
-  denot-intv A₂≤τ τ≤B₂ vval
+semanticWidening (sk-intv A₂≤A₁ B₁≤B₂) (denot-intv τ-val A₁≤τ τ≤B₁) =
+  denot-intv τ-val (st-trans A₂≤A₁ A₁≤τ) (st-trans τ≤B₁ B₁≤B₂)
 semanticWidening {n} {Γ} {_}
     (sk-darr {J₁} {J₂} {K₁} {K₂} ℿJ₁K₁kd J₂≤J₁ K₁≤K₂)
     {H}
     (denot-abs {J₁} {J₁'} {K₁} {H} {A} J₁≤J₁' f) =
-  let f' : (τₓ : Type n) → (px : H ⊢ τₓ val) → Γ ⊢ty τₓ ∈ J₂
+  let f' : (τₓ : Type n) → (px : H ⊢ τₓ val) → ⟨ H , τₓ ⟩∈'⟦ J₂ ⟧[ Γ ]
          → ⟨ H , τₓ [ px ] , A ⟩∈ℰ⟦ K₂ ⟧[ J₂ ∷ Γ ]
-      f' τₓ px τₓ∈J₂ =
-        let N gas τ A⟱τ τ∈⟦K₁⟧ = f τₓ px (k-sub τₓ∈J₂ J₂≤J₁)
+      f' τₓ px τₓ∈'⟦J₂⟧ =
+        let τ∈⟦J₁⟧ = semanticWidening J₂≤J₁ (denot-rec-ind-v τₓ∈'⟦J₂⟧)
+            N gas τ A⟱τ τ∈⟦K₁⟧ = f τₓ px (denot-ind-rec-v τ∈⟦J₁⟧)
          in
         N gas τ A⟱τ (semanticWidening K₁≤K₂ {!!})
    in
   denot-abs (sk-trans J₂≤J₁ J₁≤J₁') f'
 
-heapValue : ∀{n} {τ K} (Γ : Context n) (H : Env n) (i : Fin n) → Set
-heapValue {_} {τ} {K} Γ H i = Val.this (lookup H i) ≡ τ → ⟨ H , τ ⟩∈⟦ K ⟧[ Γ ]
-
+{-
 -- Technically, the [H ⊢ τ val] premise in [val-denot] is implied by the
 -- consistent environment premise. However, it simplifies the proofs a lot to
 -- pass it explicitly.
@@ -221,3 +339,4 @@ typesNormalize (k-sub A∈J J≤K) Γ⊨H =
   let N gas τ A⟱τ τ∈⟦J⟧ = typesNormalize A∈J Γ⊨H
    in
   N gas τ A⟱τ (semanticWidening J≤K τ∈⟦J⟧)
+  -}
