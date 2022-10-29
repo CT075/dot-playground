@@ -66,7 +66,7 @@ Let
   \item $H$ be a heap containing $X = \tau$
 \end{itemize}
 
-Then $H \vdash A \stepsn[0] \tau$, and we know $\tau \in \interval{B}{C}$.
+Then $H \vdash A \stepsn[0] \tau$, and we know $\tau : \interval{B}{C}$.
 However, there's no way to show that $\tau \le X$, because the subtyping rules
 never interact directly with variables, except in the reflexivity rule $\Gamma
 \vdash X \le X$. Instead, the $\beta$ subtyping rules use substitution.
@@ -76,9 +76,9 @@ never interact directly with variables, except in the reflexivity rule $\Gamma
 \subsubsection{Heap regularity}
 
 One idea might be to include a premise of $\Gamma \vdash X \le \tau$ in the
-definition of consistent environments $\Gamma \Vdash H$. However, this only
+definition of consistent environments $\Gamma \ H$. However, this only
 defers the problem, as it now becomes impossible to ever construct a proof that
-$\Gamma \Vdash H$.
+$\Gamma \models H$.
 
 \subsubsection{Amending the subtyping rules}
 
@@ -180,7 +180,7 @@ arbitrarily large, and we don't shrink the heap when we pass it back to
 
 \subsection{Resolution}
 
-Change the definition of $\Gamma \Vdash H$ to include $\tau \in \KEval{K}$.
+Change the definition of $\Gamma \models H$ to include $\tau \in \KEval{K}$.
 
 \end{document}
 
