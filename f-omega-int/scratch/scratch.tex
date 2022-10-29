@@ -31,7 +31,65 @@
 
 \begin{document}
 
-\section{Background}
+\section{Heap-based evaluation}
+
+Consider the case of the proof for the rule regarding singleton intervals
+below:
+
+\begin{mathpar}
+  \inferrule*[right=K-Sing]{\Gamma \vdash A : \interval{B}{C}}
+    {\Gamma \vdash A : \interval{A}{A}}
+\end{mathpar}
+
+By the inductive hypothesis, we have that there exists some $\alpha, n$ such
+that
+
+\begin{mathpar}
+  H \vdash A \stepsn[n] \alpha
+\end{mathpar}
+and
+\begin{mathpar}
+  \alpha \in \KDenot{\interval{B}{C}}
+\end{mathpar}
+
+Our obligation is to show that $\alpha \in \KDenot{\interval{A}{A}}$.
+
+The obvious way to do this is to show that $\Gamma \vdash \alpha \le A$.
+However, I don't think this is possible.
+
+Let
+\begin{itemize}
+  \item $A = X$ (e.g., a variable)
+  \item $B, C$ and $\tau$
+  \item $\Gamma$ be a context containing $X : \interval{B}{C}$ such that
+    $\Gamma \vdash \tau : \interval{B}{C}$
+  \item $H$ be a heap containing $X = \tau$
+\end{itemize}
+
+Then $H \vdash A \stepsn[0] \tau$, and we know $\tau \in \interval{B}{C}$.
+However, there's no way to show that $\tau \le X$, because the subtyping rules
+never interact directly with variables, except in the reflexivity rule $\Gamma
+\vdash X \le X$. Instead, the $\beta$ subtyping rules use substitution.
+
+\subsection{Ideas}
+
+\subsubsection{Heap regularity}
+
+One idea might be to include a premise of $\Gamma \vdash X \le \tau$ in the
+definition of consistent environments $\Gamma \Vdash H$. However, this only
+defers the problem, as it now becomes impossible to ever construct a proof that
+$\Gamma \Vdash H$.
+
+\subsubsection{Amending the subtyping rules}
+
+Another idea would be to adjust the subtyping rules, then show that Stucki's
+original formulation is equivalent to ours. However, it's not clear to me what
+changes to actually make (or that doing so would be easier than simply fixing
+the proof to use substitution rather than a heap in the first place). Changing
+the subtyping rules to themselves use a heap would work, but feels very
+inelegant.
+
+\section{Totality (RESOLVED)}
 
 My proof uses a denotation function mapping kinds to the set of normalizing
 type expressions of that kind as follows:
@@ -119,6 +177,10 @@ My best guess is that I need to somehow use some measure of the heap size and
 term size combined, but I don't know if that actually works -- $\tau$ can be
 arbitrarily large, and we don't shrink the heap when we pass it back to
 \textsc{Denot-Spec}.
+
+\subsection{Resolution}
+
+Change the definition of $\Gamma \Vdash H$ to include $\tau \in \KEval{K}$.
 
 \end{document}
 
