@@ -40,17 +40,26 @@ mutual
   norm-stmt : ∀{n} → Context n → Env n → Type n → Kind n → ℕ × Type n → Set
   norm-stmt Γ H A K (gas , τ) = (H ⊢ A ⟱[ gas ] τ) × (⟨ H , τ ⟩∈'⟦ K ⟧[ Γ ])
 
+  norm-sub₁ : ∀{n} → Context n → Env n → Type n → Type n → ℕ × Type n → Set
+  norm-sub₁ Γ H A v (gas , τ) = (H ⊢ A ⟱[ gas ] τ) × (Γ ⊢ty τ ≤ v ∈ ✶)
+
+  norm-sub₂ : ∀{n} → Context n → Env n → Type n → Type n → ℕ × Type n → Set
+  norm-sub₂ Γ H B v (gas , τ) = (H ⊢ B ⟱[ gas ] τ) × (Γ ⊢ty v ≤ τ ∈ ✶)
+
   ⟨_,_⟩∈'⟦_⟧[_] : ∀{n : ℕ} → Env n → Type n → Kind n → Context n → Set
-  ⟨ H , v ⟩∈'⟦ A ∙∙ B ⟧[ Γ ] = H ⊢ v val × Γ ⊢ty A ≤ v ∈ ✶ × Γ ⊢ty v ≤ B ∈ ✶
+  ⟨ H , v ⟩∈'⟦ A ∙∙ B ⟧[ Γ ] =
+      H ⊢ v val ×
+      (Σ[ W ∈ (ℕ × Type _) ] (norm-sub₁ Γ H A v W)) ×
+      (Σ[ W ∈ (ℕ × Type _) ] (norm-sub₂ Γ H B v W))
   ⟨ H , ƛ J' A ⟩∈'⟦ ℿ J K ⟧[ Γ ] =
     Γ ⊢kd J ≤ J' ×
     (∀ τₓ τₓval → ⟨ H , τₓ ⟩∈'⟦ J ⟧[ Γ ] →
       ⟨ (H , τₓ [ τₓval ]) , A ⟩∈'ℰ⟦ K ⟧[ J ∷ Γ ])
   ⟨ H , _ ⟩∈'⟦ ℿ J K ⟧[ Γ ] = Void
 
-  ⟨_,_⟩∈'ℰ⟦_⟧[_] : ∀{n : ℕ} (H : Env n) (A : Type n) (K : Kind n) (Γ : Context n) → Set
-  ⟨_,_⟩∈'ℰ⟦_⟧[_] {n} H A K Γ =
-    Σ[ W ∈ (ℕ × Type n) ] (norm-stmt Γ H A K W)
+  ⟨_,_⟩∈'ℰ⟦_⟧[_] : ∀{n : ℕ}
+    (H : Env n) (A : Type n) (K : Kind n) (Γ : Context n) → Set
+  ⟨_,_⟩∈'ℰ⟦_⟧[_] {n} H A K Γ = Σ[ W ∈ (ℕ × Type n) ] (norm-stmt Γ H A K W)
 
 mutual
   -- While the recursive functions above are actually sufficient for our
@@ -59,7 +68,9 @@ mutual
   -- the denot-abs constructor.
   data ⟨_,_⟩∈⟦_⟧[_] {n : ℕ} : Env n → Type n → Kind n → Context n → Set where
     denot-intv : ∀{A B H v Γ} →
-      H ⊢ v val → Γ ⊢ty A ≤ v ∈ ✶ → Γ ⊢ty v ≤ B ∈ ✶ →
+      H ⊢ v val →
+      Σ[ W ∈ (ℕ × Type n) ] (norm-sub₁ Γ H A v W) →
+      Σ[ W ∈ (ℕ × Type n) ] (norm-sub₂ Γ H B v W) →
       ⟨ H , v ⟩∈⟦ A ∙∙ B ⟧[ Γ ]
     denot-abs : ∀{J J' : Kind n} {K : Kind (suc n)} {H : Env n}
         {A : Type (suc n)} {Γ : Context n} →
@@ -67,6 +78,14 @@ mutual
       ( ∀ τₓ τₓval → ⟨ H , τₓ ⟩∈'⟦ J ⟧[ Γ ] →
           ⟨ (H , τₓ [ τₓval ]) , A ⟩∈ℰ⟦ K ⟧[ J ∷ Γ ]) →
       ⟨ H , ƛ J' A ⟩∈⟦ ℿ J K ⟧[ Γ ]
+
+  denot-typ : ∀{n } {Γ : Context n} {H : Env n} {τ : Type n} →
+    H ⊢ τ val → Γ ⊢ty τ ∈ ✶ → ⟨ H , τ ⟩∈⟦ ✶ ⟧[ Γ ]
+  denot-typ τval τ∈✶ =
+    denot-intv
+      τval
+      ((0 , ⊥) , (eval-⊥ , st-bot τ∈✶))
+      ((0 , ⊤) , (eval-⊤ , st-top τ∈✶))
 
   record ⟨_,_⟩∈ℰ⟦_⟧[_] {n : ℕ}
       (H : Env n) (A : Type n) (K : Kind n) (Γ : Context n) : Set where
@@ -121,12 +140,6 @@ denot-val : ∀{n} {Γ : Context n} {H : Env n} {τ : Type n} {K : Kind n} →
   ⟨ H , τ ⟩∈⟦ K ⟧[ Γ ] → H ⊢ τ val
 denot-val (denot-intv τ-val lower upper) = τ-val
 denot-val (denot-abs _ _) = v-abs
-
-denot-kind : ∀{n} {Γ : Context n} {H : Env n} {τ : Type n} {K : Kind n} →
-  ⟨ H , τ ⟩∈⟦ K ⟧[ Γ ] → Γ ⊢ty τ ∈ K
-denot-kind (denot-intv τ-val lower upper) = intv-spec lower upper
-denot-kind (denot-abs {J} {J'} {K} J≤J' f) =
-  k-sub {!!} (sk-darr {!!} J≤J' (sk-refl {!!}))
 
 -- TODO: The ordering of arguments here is a huge mess.
 postulate
@@ -232,10 +245,20 @@ rewriteInversionStep : ∀{n gas} {Γ : Context n} {H : Env n} {A τ J body} →
   τ ≡ ƛ J body → H ⊢ A ⟱[ gas ] τ → H ⊢ A ⟱[ gas ] (ƛ J body)
 rewriteInversionStep eq A⟱τ rewrite eq = A⟱τ
 
+postulate
+  preservation : ∀{n gas} {Γ : Context n} {H : Env n} {K A τ} →
+    Γ ⊨ H → Γ ⊢ty A ∈ K → H ⊢ A ⟱[ gas ] τ → Γ ⊢ty τ ∈ K
+
+  evaluationPreservesSubtyping :
+    ∀{n gas₁ gas₂} {Γ : Context n} {H : Env n} {A₁ A₂ α₁ α₂ τ K} →
+      Γ ⊨ H → Γ ⊢ty A₁ ≤ A₂ ∈ K →
+      H ⊢ A₁ ⟱[ gas₁ ] α₁ → H ⊢ A₂ ⟱[ gas₂ ] α₂ → Γ ⊢ty α₁ ≤ τ ∈ K →
+      Γ ⊢ty α₂ ≤ τ ∈ K
+
 semanticWidening : ∀{n} {Γ : Context n} {K₁ K₂} →
   Γ ⊢kd K₁ ≤ K₂ → ∀{H τ} → ⟨ H , τ ⟩∈⟦ K₁ ⟧[ Γ ] → ⟨ H , τ ⟩∈⟦ K₂ ⟧[ Γ ]
 semanticWidening (sk-intv A₂≤A₁ B₁≤B₂) (denot-intv τ-val A₁≤τ τ≤B₁) =
-  denot-intv τ-val (st-trans A₂≤A₁ A₁≤τ) (st-trans τ≤B₁ B₁≤B₂)
+  denot-intv τ-val {! (st-trans A₂≤A₁ A₁≤τ) !} {! (st-trans τ≤B₁ B₁≤B₂) !}
 semanticWidening {n} {Γ} {_}
     (sk-darr {J₁} {J₂} {K₁} {K₂} ℿJ₁K₁kd J₂≤J₁ K₁≤K₂)
     {H}
@@ -250,67 +273,33 @@ semanticWidening {n} {Γ} {_}
    in
   denot-abs (sk-trans J₂≤J₁ J₁≤J₁') f'
 
-{-
--- Technically, the [H ⊢ τ val] premise in [val-denot] is implied by the
--- consistent environment premise. However, it simplifies the proofs a lot to
--- pass it explicitly.
-val-denot : ∀{n} {Γ : Context n} {H : Env n} {τ : Type n} {K : Kind n} →
-  Γ ⊢ty τ ∈ K → Γ ⊨ H → H ⊢ τ val → ⟨ H , τ ⟩∈⟦ K ⟧[ Γ ]
-
 -- Following the other schemes, another name for [typesNormalize] would be
 -- kind-denot-ℰ
 typesNormalize : ∀{n} {Γ : Context n} {H : Env n} {A K} →
   Γ ⊢ty A ∈ K → Γ ⊨ H → ⟨ H , A ⟩∈ℰ⟦ K ⟧[ Γ ]
-
-val-denot (k-var Γ-is-ctx trace) _ ()
-val-denot k-top _ = denot-typ k-top
-val-denot k-bot _ = denot-typ k-bot
-val-denot (k-arr τ₁ τ₂) _ (v-arr p₁ p₂) = denot-typ (k-arr τ₁ τ₂) (v-arr p₁ p₂)
-val-denot (k-all x p) _ = denot-typ (k-all x p)
-val-denot {n} {Γ} {H} {ƛ J A} {ℿ J K}
-  (k-abs J-is-kd K-is-kd) Γ⊨H v-abs =
-  let body-normalizes :
-        (τₓ : Type n) → (px : H ⊢ τₓ val) → Γ ⊢ty τₓ ∈ J →
-        ⟨ H , τₓ [ px ] , A ⟩∈ℰ⟦ K ⟧[ J ∷ Γ ]
-      body-normalizes τₓ τₓval τₓ∈J =
-        typesNormalize
-          -- TODO: need a substitution lemma here
-          {! Γ ⊢ty body[τₓ] ∈ J !}
-          (c-cons (val-denot τₓ∈J Γ⊨H τₓval) Γ⊨H)
-   in
-  denot-abs (sk-refl J-is-kd) body-normalizes
-val-denot (k-app p p₁ x x₁) _ ()
-val-denot (k-sing A-is-bounded) _ =
-  denot-intv (st-bnd₁ (k-sing A-is-bounded)) (st-bnd₂ (k-sing A-is-bounded))
-val-denot (k-sub A∈J J≤K) Γ⊨H A-val =
-  semanticWidening J≤K (val-denot A∈J Γ⊨H A-val)
-
 typesNormalize (k-var Γ-is-ctx trace) Γ⊨H =
   let L τ τ∈⟦K⟧ τ∈H = consistentEnv Γ⊨H trace
    in
-  -- We run into issues with the termination checker here. τ is not a subterm
-  -- of (Var n) and can be arbitrarily large. The problematic case is when
-  -- [τ] is [ƛ J (Var m)], as we then re-recurse on [typesNormalize] to
-  -- generate the witness for [denot-abs].
   N 0 τ (eval-var τ∈H) τ∈⟦K⟧
-typesNormalize k-top _ = N 0 ⊤ eval-⊤ (denot-typ k-top v-top)
-typesNormalize k-bot _ = N 0 ⊥ eval-⊥ (denot-typ k-bot v-bot)
+typesNormalize k-top _ = N 0 ⊤ eval-⊤ (denot-typ v-top k-top)
+typesNormalize k-bot _ = N 0 ⊥ eval-⊥ (denot-typ v-bot k-bot)
 typesNormalize (k-arr A∈✶ B∈✶) Γ⊨H =
-  let N a α evalA denotA = typesNormalize A∈✶ Γ⊨H
-      N b β evalB denotB = typesNormalize B∈✶ Γ⊨H
-      varr = v-arr (⟱-spec evalA) (⟱-spec evalB)
+  let N a α A⟱α denotA = typesNormalize A∈✶ Γ⊨H
+      N b β B⟱β denotB = typesNormalize B∈✶ Γ⊨H
+      varr = v-arr (⟱-spec A⟱α) (⟱-spec B⟱β)
    in
   N (a + b)
     (α ⇒ β)
-    (eval-arr evalA evalB)
-    (denot-typ (k-arr {!!} (denot-kind denotB)) varr)
+    (eval-arr A⟱α B⟱β)
+    (denot-typ varr
+               (k-arr (preservation Γ⊨H A∈✶ A⟱α) (preservation Γ⊨H B∈✶ B⟱β)))
 typesNormalize (k-all {K} {A} pK pA) _ =
-  N 0 (∀' K A) eval-∀' (denot-typ (k-all pK pA) v-all)
+  N 0 (∀' K A) eval-∀' (denot-typ v-all (k-all pK pA))
 typesNormalize {n} {Γ} {H} (k-abs {J} {K} {A} J-isKd A∈K) Γ⊨H =
-  let d-inner : (τ : Type n) → (vτ : H ⊢ τ val) → Γ ⊢ty τ ∈ J →
-        ⟨ (H , τ [ vτ ]) , A ⟩∈ℰ⟦ K ⟧[ J ∷ Γ ]
-      d-inner τ τval τ∈J =
-        typesNormalize {suc n} A∈K (c-cons ({! val-denot τ∈J Γ⊨H τval !}) Γ⊨H)
+  let d-inner : (τ : Type n) → (τval : H ⊢ τ val) → ⟨ H , τ ⟩∈'⟦ J ⟧[ Γ ] →
+        ⟨ (H , τ [ τval ]) , A ⟩∈ℰ⟦ K ⟧[ J ∷ Γ ]
+      d-inner τ τval τ∈'J =
+        typesNormalize {suc n} A∈K (c-cons (denot-rec-ind-v τ∈'J) Γ⊨H)
 
       denot = denot-abs (sk-refl J-isKd) d-inner
    in
@@ -321,7 +310,7 @@ typesNormalize {_} {Γ} {H}
       F body _ _ expand proof = functionInversion α∈⟦ℿJK⟧ Γ⊨H
       N b β B⟱β β∈⟦J⟧ = typesNormalize B∈J Γ⊨H
       βval = denot-val β∈⟦J⟧
-      N n τ α∙β⟱τ τ∈⟦KB⟧ = proof β (denot-val β∈⟦J⟧) (denot-kind β∈⟦J⟧)
+      N n τ α∙β⟱τ τ∈⟦KB⟧ = proof β (denot-val β∈⟦J⟧) (denot-ind-rec-v β∈⟦J⟧)
    in
   N (a + b + n)
     (plugTy τ β)
@@ -329,14 +318,14 @@ typesNormalize {_} {Γ} {H}
       (rewriteInversionStep {_} {a} {Γ} {H} {_} {α} expand A⟱α)
       B⟱β
       α∙β⟱τ)
+    -- Have τ ∈ ⟦plugKd K B⟧, need plugTy τ β ∈ ⟦plugKd K β⟧
     {! τ∈⟦KB⟧ !}
-typesNormalize (k-sing p) Γ⊨H =
-  let N gas τ eval denot = typesNormalize p Γ⊨H
+typesNormalize (k-sing A∈B∙∙C) Γ⊨H =
+  let N gas τ A⟱τ A∈⟦B∙∙C⟧ = typesNormalize A∈B∙∙C Γ⊨H
    in
   -- TODO: need to show that A ⟱ τ implies τ ≤ A
-  N gas τ eval (denot-intv {!!} {!!} (⟱-spec eval))
+  N gas τ A⟱τ (denot-intv (⟱-spec A⟱τ) {!!} {!!})
 typesNormalize (k-sub A∈J J≤K) Γ⊨H =
   let N gas τ A⟱τ τ∈⟦J⟧ = typesNormalize A∈J Γ⊨H
    in
   N gas τ A⟱τ (semanticWidening J≤K τ∈⟦J⟧)
-  -}

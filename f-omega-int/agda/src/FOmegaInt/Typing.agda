@@ -109,3 +109,6 @@ postulate
   weaken-st : ∀{n} {Γ : Context n} {A B K K'} →
     Γ ⊢ty A ≤ B ∈ K → K' ∷ Γ ⊢ty (weakenTy A) ≤ (weakenTy B) ∈ (weakenKd K)
 
+  st-kinding : ∀{n} {Γ : Context n} {A B K} →
+    Γ ⊢ty A ≤ B ∈ K → Γ ⊢ty A ∈ K × Γ ⊢ty B ∈ K
+
