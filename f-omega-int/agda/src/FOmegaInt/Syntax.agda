@@ -3,10 +3,15 @@ module FOmegaInt.Syntax where
 open import Data.Fin using (Fin; suc; zero)
 import Data.Fin.Substitution as S
 open import Data.Fin.Substitution.Lemmas
-open import Data.Nat using (ℕ; suc; zero; _+_)
+open import Data.Nat using (ℕ; suc; zero; _+_; _<_; s≤s)
+open import Data.Nat.Properties using (<-transˡ; m≤m+n; m≤n+m)
 open import Data.Bool using (if_then_else_)
 import Data.Vec as Vec
+open import Relation.Binary hiding (_⇒_)
+open import Relation.Binary.PropositionalEquality as PropEq hiding ([_])
+open import Induction.WellFounded
 
+open import Induction.WellFounded.Mutual
 import Data.Context as C
 
 -- TODO: Separate type and term variables
@@ -26,6 +31,8 @@ mutual
     _∙_ : Type n → Type n → Type n
 
 pattern ✶ = ⊥ ∙∙ ⊤
+
+-- Substitutions
 
 module KindTypeApp {T : ℕ → Set} (l : S.Lift T Type) where
   infix 8 _/ty_
@@ -112,6 +119,78 @@ open Ops using
   ; sub
   ; _↑
   ) public
+
+-- "Size" of kinds -- necessary to aid the termination checker
+
+size : ∀{n} → Kind n → ℕ
+-- Although intervals can themselves contain kinds (e.g., via a ∀' form), we
+-- don't consider them, because we never need to actually recurse into those
+-- kinds.
+size (A ∙∙ B) = zero
+size (ℿ J K) = suc (size J + size K)
+
+_<kd_ : ∀{n} → Kind n → Kind n → Set
+J <kd K = size J < size K
+
+-- Well-founded recursion on kind size
+
+mutual
+  <kd-wf : ∀{n} → WellFounded (_<kd_ {n})
+  <kd-wf {n} K = acc (<kd-acc {n} (size K))
+
+  <kd-acc : ∀ {n} i K → size {n} K < i → Acc _<kd_ K
+  <kd-acc zero K ()
+  <kd-acc (suc n) (A ∙∙ B) _ = acc (λ _ ())
+  <kd-acc (suc n) (ℿ J K) (s≤s ℿJK≤n) =
+    acc (λ J J<ℿJK → <kd-acc n J (<-transˡ J<ℿJK ℿJK≤n))
+
+module _ {ℓ} {n} where
+  open All (<kd-wf {n}) ℓ public
+    renaming ( wfRecBuilder to <kd-recBuilder
+             ; wfRec to <kd-rec
+             )
+    hiding (wfRec-builder)
+
+  open Nary (<kd-wf {n}) ℓ public
+    renaming (wfMutual to <kd-mutual)
+
+-- Substitution lemmas
+
+subst-preserves-size : ∀{n m} →
+  (K : Kind n) → (σ : S.Sub Type n m) → size (K /Kd σ) ≡ size K
+subst-preserves-size (A ∙∙ B) σ = refl
+subst-preserves-size (ℿ J K) σ = begin
+    size ((ℿ J K) /Kd σ)
+  ≡⟨ refl ⟩
+    size (ℿ (J /Kd σ) (K /Kd σ ↑))
+  ≡⟨ refl ⟩
+    suc (size (J /Kd σ) + size (K /Kd σ ↑))
+  ≡⟨ cong (λ t → suc (t + size (K /Kd σ ↑))) (subst-preserves-size J σ) ⟩
+    suc (size J + size (K /Kd σ ↑))
+  ≡⟨ cong (λ t → suc (size J + t)) (subst-preserves-size K (σ ↑)) ⟩
+    suc (size J + size K)
+  ≡⟨ refl ⟩
+    size (ℿ J K)
+  ∎
+  where
+    open ≡-Reasoning
+
+<ℿ₁ : ∀{n} (J : Kind n) K → J <kd ℿ J K
+<ℿ₁ J K = s≤s (m≤m+n (size J) (size K))
+
+<ℿ₂ : ∀{n} (J : Kind n) K τ → plugKd K τ <kd ℿ J K
+<ℿ₂ J K τ rewrite subst-preserves-size K (sub τ) =
+  s≤s (m≤n+m (size K) (size J))
+
+size' : ∀{n} → Kind n → ℕ
+size' = <kd-rec _ go
+  where
+    go : ∀ K → (∀ J → J <kd K → ℕ) → ℕ
+    go (A ∙∙ B) _ = zero
+    go (ℿ J K) rec =
+      rec J (<ℿ₁ J K) + rec (plugKd K ⊤) (<ℿ₂ J K ⊤)
+
+-- Kinding Contexts
 
 module Context where
   open C hiding (Ctx)

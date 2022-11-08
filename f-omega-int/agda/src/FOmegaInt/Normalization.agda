@@ -18,49 +18,107 @@ Morally, we'd like to define our relation like this:
 
   module NotStrictlyPositive where
     mutual
-      data ⟨_,_⟩∈⟦_⟧[_] {n : ℕ} : Env n → Type n → Kind n → Context n → Set where
-        denot-typ : ∀{H v Γ} → Γ ⊢ty v ∈ ✶ → H ⊢ v val → ⟨ H , v ⟩∈⟦ ✶ ⟧[ Γ ]
-        denot-intv : ∀{A B H v Γ} →
-          Γ ⊢ty A ≤ v ∈ ✶ → Γ ⊢ty v ≤ B ∈ ✶ → H ⊢ v val →
-          ⟨ H , v ⟩∈⟦ A ∙∙ B ⟧[ Γ ]
-        denot-abs : ∀{J J' : Kind n} {K : Kind (suc n)} {H : Env n}
-            {A : Type (suc n)} {Γ : Context n} →
-          Γ ⊢kd J ≤ J' →
-          ( (τₓ : Type n) → (px : H ⊢ τₓ val) → ⟨ H , τₓ ⟩∈⟦ J ⟧
-          → ⟨ H , τₓ [ px ] , A ⟩∈ℰ⟦ K ⟧[ J ∷ Γ ]
-          ) →
-          ⟨ H , ƛ J' A ⟩∈⟦ ℿ J K ⟧[ Γ ]
+      data ⟨_⟩∈⟦_⟧ : Type zero → Kind zero → Set where
+        denot-intv : ∀{A B v} →
+          [] ⊢ty A ≤ v ∈ ✶ → [] ⊢ty v ≤ B ∈ ✶ → v val →
+          ⟨ v ⟩∈⟦ A ∙∙ B ⟧
+        denot-abs : ∀{J J' : Kind zero} {K : Kind (suc zero)}
+            {A : Type (suc zero)} →
+          [] ⊢kd J ≤ J' →
+          ((τₓ : Type zero) → ⟨ τₓ ⟩∈⟦ J ⟧ → ⟨ plug A τₓ ⟩∈ℰ⟦ plug K τₓ ⟧) →
+          ⟨ ƛ J' A ⟩∈⟦ ℿ J K ⟧
 
 However, this type isn't strictly positive (see the ⟨_,_⟩∈⟦_⟧ as a function
 input in the denot-abs constructor), so we need to use structural recursion to
 define this datatype.
 -}
 
+private mutual
+  unfold-denot :
+    (K : Kind zero) →
+    (∀ J → J <kd K → Type zero → Set) →
+    (∀ J → J <kd K → Type zero → Set) →
+    Type zero → Set
+  unfold-denot (A ∙∙ B) _ _ τ = τ val × [] ⊢ty A ≤ τ ∈ ✶ × [] ⊢ty τ ≤ B ∈ ✶
+  unfold-denot (ℿ J K) recV recE (ƛ J' A) =
+    -- This monstrosity is necessary to appease the termination checker,
+    -- which otherwise can't tell that [plugTy K τₓ] is smaller than
+    -- [ℿ J K].
+    [] ⊢kd J ≤ J' ×
+      (∀ τₓ →
+        -- ⟨ τₓ ⟩∈'⟦ J ⟧
+        recV J (<ℿ₁ J K) τₓ →
+        --⟨ plugTy A τₓ ⟩∈'ℰ⟦ plugKd K τₓ ⟧
+        recE (plugKd K τₓ) (<ℿ₂ J K τₓ) (plugTy A τₓ))
+  unfold-denot (ℿ J K) _ _ _ = Void
+
+  unfold-denot-eval :
+    (K : Kind zero) →
+    (∀ J → J <kd K → Type zero → Set) →
+    (∀ J → J <kd K → Type zero → Set) →
+    Type zero → Set
+  unfold-denot-eval K recV recE A = Σ[ W ∈ (ℕ × Type zero) ](
+    let (gas , τ) = W
+     in
+    A ⟱[ gas ] τ × unfold-denot K recV recE τ)
+
+  unfold-joined : Fin 2 → Kind zero → Type zero → Set
+  unfold-joined = <kd-mutual _ unfold-denots
+    where
+      unfold-denots :
+        Fin 2 →
+        (K : Kind zero) → (Fin 2 → (∀ J → J <kd K → Type zero → Set)) →
+        Type zero → Set
+      unfold-denots i K f with i
+      ...                   | zero = unfold-denot K (f zero) (f (suc zero))
+      ...                   | (suc zero) =
+                                unfold-denot-eval K (f zero) (f (suc zero))
+
+⟨_⟩∈'⟦_⟧ : Type zero → Kind zero → Set
+⟨ τ ⟩∈'⟦ K ⟧ = unfold-joined zero K τ
+
+⟨_⟩∈'ℰ⟦_⟧ : Type zero → Kind zero → Set
+⟨ A ⟩∈'ℰ⟦ K ⟧ = unfold-joined (suc zero) K A
+
 mutual
-  norm-stmt : ∀{n} → Context n → Env n → Type n → Kind n → ℕ × Type n → Set
-  norm-stmt Γ H A K (gas , τ) = (H ⊢ A ⟱[ gas ] τ) × (⟨ H , τ ⟩∈'⟦ K ⟧[ Γ ])
+  -- While the recursive functions above are actually sufficient for our
+  -- purposes, they're a pain to pattern match on, so we provide an
+  -- inductive-recursive view here. Notice the use of ∈' (instead of just ∈) in
+  -- the denot-abs constructor.
+  data ⟨_⟩∈⟦_⟧ : Type zero → Kind zero → Set where
+    denot-intv : ∀{A B v} →
+      v val → [] ⊢ty A ≤ v ∈ ✶ → [] ⊢ty v ≤ B ∈ ✶ → ⟨ v ⟩∈⟦ A ∙∙ B ⟧
+    denot-abs : ∀{J J' K A} →
+      [] ⊢kd J ≤ J' →
+      (∀ τₓ → ⟨ τₓ ⟩∈'⟦ J ⟧ → ⟨ plugTy A τₓ ⟩∈ℰ⟦ plugKd K τₓ ⟧) →
+      ⟨ ƛ J' A ⟩∈⟦ ℿ J K ⟧
 
-  norm-sub₁ : ∀{n} → Context n → Env n → Type n → Type n → ℕ × Type n → Set
-  norm-sub₁ Γ H A v (gas , τ) = (H ⊢ A ⟱[ gas ] τ) × (Γ ⊢ty τ ≤ v ∈ ✶)
+  record ⟨_⟩∈ℰ⟦_⟧ (A : Type zero) (K : Kind zero) : Set where
+    inductive
+    constructor N
+    field
+      gas : ℕ
+      τ : Type zero
+      eval : A ⟱[ gas ] τ
+      denot : ⟨ τ ⟩∈⟦ K ⟧
 
-  norm-sub₂ : ∀{n} → Context n → Env n → Type n → Type n → ℕ × Type n → Set
-  norm-sub₂ Γ H B v (gas , τ) = (H ⊢ B ⟱[ gas ] τ) × (Γ ⊢ty v ≤ τ ∈ ✶)
+-- Proof that the recursive view implies the inductive view
+private mutual
+  denot-ind-rec-v : ∀{τ : Type zero} {K : Kind zero} →
+    ⟨ τ ⟩∈'⟦ K ⟧ → ⟨ τ ⟩∈⟦ K ⟧
+  denot-ind-rec-v {_} {A ∙∙ B} (τ-val , A≤τ , τ≤B) =
+    denot-intv τ-val A≤τ τ≤B
+  denot-ind-rec-v {ƛ J' A} {ℿ J K} (J≤J' , f) = denot-abs J≤J' f'
+    where
+      f' : (τₓ : Type zero) → ⟨ τₓ ⟩∈'⟦ J ⟧ → ⟨ plugTy A τₓ ⟩∈ℰ⟦ plugKd K τₓ ⟧
+      f' τₓ τₓ∈'⟦J⟧ = {!!}
 
-  ⟨_,_⟩∈'⟦_⟧[_] : ∀{n : ℕ} → Env n → Type n → Kind n → Context n → Set
-  ⟨ H , v ⟩∈'⟦ A ∙∙ B ⟧[ Γ ] =
-      H ⊢ v val ×
-      (Σ[ W ∈ (ℕ × Type _) ] (norm-sub₁ Γ H A v W)) ×
-      (Σ[ W ∈ (ℕ × Type _) ] (norm-sub₂ Γ H B v W))
-  ⟨ H , ƛ J' A ⟩∈'⟦ ℿ J K ⟧[ Γ ] =
-    Γ ⊢kd J ≤ J' ×
-    (∀ τₓ τₓval → ⟨ H , τₓ ⟩∈'⟦ J ⟧[ Γ ] →
-      ⟨ (H , τₓ [ τₓval ]) , A ⟩∈'ℰ⟦ K ⟧[ J ∷ Γ ])
-  ⟨ H , _ ⟩∈'⟦ ℿ J K ⟧[ Γ ] = Void
+  denot-rec-ind-e : ∀{τ : Type zero} {K : Kind zero} →
+    ⟨ τ ⟩∈'ℰ⟦ K ⟧ → ⟨ τ ⟩∈ℰ⟦ K ⟧
+  denot-rec-ind-e ((gas , τ) , (eval , denot)) =
+    N gas τ eval (denot-ind-rec-v denot)
 
-  ⟨_,_⟩∈'ℰ⟦_⟧[_] : ∀{n : ℕ}
-    (H : Env n) (A : Type n) (K : Kind n) (Γ : Context n) → Set
-  ⟨_,_⟩∈'ℰ⟦_⟧[_] {n} H A K Γ = Σ[ W ∈ (ℕ × Type n) ] (norm-stmt Γ H A K W)
-
+{-
 mutual
   -- While the recursive functions above are actually sufficient for our
   -- purposes, they're a pain to pattern match on, so we provide an
@@ -86,36 +144,6 @@ mutual
       τval
       ((0 , ⊥) , (eval-⊥ , st-bot τ∈✶))
       ((0 , ⊤) , (eval-⊤ , st-top τ∈✶))
-
-  record ⟨_,_⟩∈ℰ⟦_⟧[_] {n : ℕ}
-      (H : Env n) (A : Type n) (K : Kind n) (Γ : Context n) : Set where
-    inductive
-    constructor N
-    field
-      gas : ℕ
-      τ : Type n
-      eval : H ⊢ A ⟱[ gas ] τ
-      denot : ⟨ H , τ ⟩∈⟦ K ⟧[ Γ ]
-
-mutual
-  -- Proof that the recursive view implies the inductive view
-  denot-rec-ind-v :
-    ∀{n} {Γ : Context n} {H : Env n} {τ : Type n} {K : Kind n} →
-    ⟨ H , τ ⟩∈'⟦ K ⟧[ Γ ] → ⟨ H , τ ⟩∈⟦ K ⟧[ Γ ]
-  denot-rec-ind-v {_} {_} {_} {_} {A ∙∙ B} (τ-val , A≤τ , τ≤B) =
-    denot-intv τ-val A≤τ τ≤B
-  denot-rec-ind-v {n} {Γ} {H} {ƛ J' A} {ℿ J K} (J≤J' , f) =
-    let f' : (τₓ : Type n) → (τₓval : H ⊢ τₓ val) → ⟨ H , τₓ ⟩∈'⟦ J ⟧[ Γ ] →
-               ⟨ (H , τₓ [ τₓval ]) , A ⟩∈ℰ⟦ K ⟧[ J ∷ Γ ]
-        f' τₓ τₓval p = denot-rec-ind-e (f τₓ τₓval p)
-     in
-    denot-abs J≤J' f'
-
-  denot-rec-ind-e :
-    ∀{n} {Γ : Context n} {H : Env n} {τ : Type n} {K : Kind n} →
-    ⟨ H , τ ⟩∈'ℰ⟦ K ⟧[ Γ ] → ⟨ H , τ ⟩∈ℰ⟦ K ⟧[ Γ ]
-  denot-rec-ind-e ((gas , τ) , (eval , denot)) =
-    N gas τ eval (denot-rec-ind-v denot)
 
 mutual
   -- Proof that the inductive view implies the recursive view
@@ -329,3 +357,4 @@ typesNormalize (k-sub A∈J J≤K) Γ⊨H =
   let N gas τ A⟱τ τ∈⟦J⟧ = typesNormalize A∈J Γ⊨H
    in
   N gas τ A⟱τ (semanticWidening J≤K τ∈⟦J⟧)
+  -}
