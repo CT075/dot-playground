@@ -3,9 +3,13 @@ module FOmegaInt.Syntax where
 open import Data.Fin using (Fin; suc; zero)
 import Data.Fin.Substitution as S
 open import Data.Fin.Substitution.Lemmas
-open import Data.Nat using (ℕ; suc; zero; _+_)
+open import Data.Nat using (ℕ; suc; zero; _+_; _<_; s≤s)
+open import Data.Nat.Properties using (<-transˡ; m≤m+n; m≤n+m)
 open import Data.Bool using (if_then_else_)
 import Data.Vec as Vec
+open import Relation.Binary hiding (_⇒_)
+open import Relation.Binary.PropositionalEquality as PropEq hiding ([_])
+open import Induction.WellFounded
 
 import Data.Context as C
 
@@ -26,6 +30,8 @@ mutual
     _∙_ : Type n → Type n → Type n
 
 pattern ✶ = ⊥ ∙∙ ⊤
+
+-- Substitutions
 
 module KindTypeApp {T : ℕ → Set} (l : S.Lift T Type) where
   infix 8 _/ty_
@@ -112,6 +118,8 @@ open Ops using
   ; sub
   ; _↑
   ) public
+
+-- Kinding Contexts
 
 module Context where
   open C hiding (Ctx)

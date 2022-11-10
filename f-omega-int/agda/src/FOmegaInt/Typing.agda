@@ -91,24 +91,64 @@ mutual
     st-sub : ∀{J K A₁ A₂} → Γ ⊢ty A₁ ≤ A₂ ∈ J → Γ ⊢kd J ≤ K → Γ ⊢ty A₁ ≤ A₂ ∈ K
 
   -- Type equality
-  data _⊢ty_==_∈_ {n} (Γ : Context n) : Type n → Type n → Kind n → Set where
-    st-antisym : ∀{K A B} →
-      Γ ⊢ty A ≤ B ∈ K → Γ ⊢ty B ≤ A ∈ K → Γ ⊢ty A == B ∈ K
+  record _⊢ty_==_∈_ {n}
+      (Γ : Context n) (A : Type n) (B : Type n) (K : Kind n) : Set where
+    inductive
+    constructor E
+    field
+      left : Γ ⊢ty A ≤ B ∈ K
+      right : Γ ⊢ty B ≤ A ∈ K
+
+eq-refl : ∀{n} {Γ : Context n} {A K} → Γ ⊢ty A ∈ K → Γ ⊢ty A == A ∈ K
+eq-refl A∈K = E (st-refl A∈K) (st-refl A∈K)
+
+eq-sym : ∀{n} {Γ : Context n} {A B K} → Γ ⊢ty A == B ∈ K → Γ ⊢ty B == A ∈ K
+eq-sym (E A≤B B≤A) = E B≤A A≤B
+
+-- Validity lemmas
+
+postulate
+  kinding-valid : ∀{n} {Γ : Context n} {A K} → Γ ⊢ty A ∈ K → Γ ⊢ K kd
+
+  subkinding-valid : ∀{n} {Γ : Context n} {J K} →
+    Γ ⊢kd J ≤ K → Γ ⊢ J kd × Γ ⊢ K kd
+
+  subtyping-valid : ∀{n} {Γ : Context n} {A B K} →
+    Γ ⊢ty A ≤ B ∈ K → Γ ⊢ty A ∈ K × Γ ⊢ty B ∈ K
+
+  kinding-subst : ∀{n} {Γ : Context n} {A τ J K} →
+    J ∷ Γ ⊢ty A ∈ K → Γ ⊢ty τ ∈ J → Γ ⊢ty plugTy A τ ∈ plugKd K τ
 
 -- Lemmas
 
+intv-invert : ∀{n} {Γ : Context n} {B C} →
+  Γ ⊢ B ∙∙ C kd → Γ ⊢ty B ∈ ✶ × Γ ⊢ty C ∈ ✶
+intv-invert wf-type = k-bot , k-top
+intv-invert (wf-intv B∈✶ C∈✶) = B∈✶ , C∈✶
+
+intv-proper : ∀{n} {Γ : Context n} {A B C} → Γ ⊢ty A ∈ B ∙∙ C → Γ ⊢ty A ∈ ✶
+intv-proper A∈B∙∙C =
+  let A∈A∙∙A = k-sing A∈B∙∙C
+      ⊥≤A = st-bot A∈B∙∙C
+      A≤⊤ = st-top A∈B∙∙C
+      A∙∙A≤⊥∙∙⊤ = sk-intv ⊥≤A A≤⊤
+   in
+  k-sub A∈A∙∙A A∙∙A≤⊥∙∙⊤
+
 postulate
-  intv-spec : ∀{n} {Γ : Context n} {A B C} →
-    Γ ⊢ty B ≤ A ∈ ✶ → Γ ⊢ty A ≤ C ∈ ✶ → Γ ⊢ty A ∈ B ∙∙ C
+  intv-widen : ∀{n} {Γ : Context n} {A B C} →
+    Γ ⊢ty A ∈ B ∙∙ C → Γ ⊢kd B ∙∙ C ≤ ✶
+
+  intv-spec : ∀{n} {Γ : Context n} {A B C K} →
+    Γ ⊢ty B ≤ A ∈ K → Γ ⊢ty A ≤ C ∈ K → Γ ⊢ty A ∈ B ∙∙ C
 
   sk-trans : ∀{n} {Γ : Context n} {J K L} →
     Γ ⊢kd J ≤ K → Γ ⊢kd K ≤ L → Γ ⊢kd J ≤ L
 
   sk-refl : ∀{n} {Γ : Context n} {K} → Γ ⊢ K kd → Γ ⊢kd K ≤ K
 
+  sk-plug : ∀{n} {Γ : Context n} {K₁ K₂ J τ} →
+    J ∷ Γ ⊢kd K₁ ≤ K₂ → Γ ⊢ty τ ∈ J → Γ ⊢kd (plugKd K₁ τ) ≤ (plugKd K₂ τ)
+
   weaken-st : ∀{n} {Γ : Context n} {A B K K'} →
     Γ ⊢ty A ≤ B ∈ K → K' ∷ Γ ⊢ty (weakenTy A) ≤ (weakenTy B) ∈ (weakenKd K)
-
-  st-kinding : ∀{n} {Γ : Context n} {A B K} →
-    Γ ⊢ty A ≤ B ∈ K → Γ ⊢ty A ∈ K × Γ ⊢ty B ∈ K
-
