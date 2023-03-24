@@ -41,7 +41,7 @@ define this datatype.
 -- interval kind, which halts the recursion anyway).
 --
 -- We can make Agda accept this definition by using [Induction.WellFounded] in
--- the standard library using the above measure. However, actually _using+ such
+-- the standard library using the above measure. However, actually *using* such
 -- a definition becomes impossible, as Agda's type checker seems to be unable
 -- to tell that the recursive calls necessary in the [ℿ J K] clause are in fact
 -- equal to the outermost type, so the inner function becomes unusable.
@@ -51,6 +51,7 @@ mutual
   ⟨ τ ⟩∈'⟦ A ∙∙ B ⟧ = τ val × [] ⊢ty A ≤ τ ∈ ✶ × [] ⊢ty τ ≤ B ∈ ✶
   ⟨ ƛ J' A ⟩∈'⟦ ℿ J K ⟧ =
     [] ⊢kd J ≤ J' ×
+    J' ∷ [] ⊢ty A ∈ K ×
       (∀ τₓ →
         ⟨ τₓ ⟩∈'⟦ J ⟧ →
         ⟨ plugTy A τₓ ⟩∈'ℰ⟦ plugKd K τₓ ⟧)
@@ -72,6 +73,7 @@ mutual
       v val → [] ⊢ty A ≤ v ∈ ✶ → [] ⊢ty v ≤ B ∈ ✶ → ⟨ v ⟩∈⟦ A ∙∙ B ⟧
     denot-abs : ∀{J J' K A} →
       [] ⊢kd J ≤ J' →
+      J' ∷ [] ⊢ty A ∈ K →
       (∀ τₓ → ⟨ τₓ ⟩∈'⟦ J ⟧ → ⟨ plugTy A τₓ ⟩∈ℰ⟦ plugKd K τₓ ⟧) →
       ⟨ ƛ J' A ⟩∈⟦ ℿ J K ⟧
 
@@ -89,7 +91,18 @@ denot-typ τ∈✶ τ-val = denot-intv τ-val (st-bot τ∈✶) (st-top τ∈✶
 
 denot-val : ∀{τ : Type zero} {K : Kind zero} → ⟨ τ ⟩∈⟦ K ⟧ → τ val
 denot-val (denot-intv τ-val lower upper) = τ-val
-denot-val (denot-abs _ _) = v-abs
+denot-val (denot-abs _ _ _) = v-abs
+
+denot-kd : ∀{τ : Type zero} {K : Kind zero} → ⟨ τ ⟩∈⟦ K ⟧ → [] ⊢ty τ ∈ K
+denot-kd (denot-intv τ-val lower upper) = intv-spec lower upper
+denot-kd (denot-abs {J} {J'} {K} {A} J≤J' [J']⊢A∈K f) =
+  let J-kd , J'-kd = subkinding-valid J≤J'
+      [J']⊢K-kd = kinding-valid [J']⊢A∈K
+   in
+  k-sub (k-abs J'-kd [J']⊢A∈K)
+        (sk-darr (wf-darr J'-kd [J']⊢K-kd)
+                 J≤J'
+                 (sk-refl (wf-narrow [J']⊢K-kd J≤J')))
 
 -- Proof that the recursive view implies the inductive view
 
@@ -103,7 +116,7 @@ mutual
   denot-rec-ind-v : ∀{τ : Type zero} {K : Kind zero} →
     ⟨ τ ⟩∈'⟦ K ⟧ → ⟨ τ ⟩∈⟦ K ⟧
   denot-rec-ind-v {τ} {A ∙∙ B} (τval , A≤τ , τ≤B) = denot-intv τval A≤τ τ≤B
-  denot-rec-ind-v {ƛ J' A} {ℿ J K} (J≤J' , f) = denot-abs J≤J' f'
+  denot-rec-ind-v {ƛ J' A} {ℿ J K} (J≤J' , A∈K , f) = denot-abs J≤J' A∈K f'
     where
       f' : (τₓ : Type zero) → ⟨ τₓ ⟩∈'⟦ J ⟧ → ⟨ plugTy A τₓ ⟩∈ℰ⟦ plugKd K τₓ ⟧
       f' τₓ τₓ∈'⟦J⟧ = denot-rec-ind-e (f τₓ τₓ∈'⟦J⟧)
@@ -119,7 +132,7 @@ mutual
   denot-ind-rec-v : ∀{τ : Type zero} {K : Kind zero} →
     ⟨ τ ⟩∈⟦ K ⟧ → ⟨ τ ⟩∈'⟦ K ⟧
   denot-ind-rec-v (denot-intv τ-val lower upper) = τ-val , lower , upper
-  denot-ind-rec-v {ƛ J' A} {ℿ J K} (denot-abs J≤J' f') = J≤J' , f
+  denot-ind-rec-v {ƛ J' A} {ℿ J K} (denot-abs J≤J' A∈K f') = J≤J' , A∈K , f
     where
       f : (τₓ : Type zero) → ⟨ τₓ ⟩∈'⟦ J ⟧ → ⟨ plugTy A τₓ ⟩∈'ℰ⟦ plugKd K τₓ ⟧
       f τₓ τₓ∈'⟦J⟧ = denot-ind-rec-e (f' τₓ τₓ∈'⟦J⟧)
@@ -140,7 +153,7 @@ record FunctionInversion (J : Kind 0) (K : Kind 1) (τ : Type 0) : Set where
             → ⟨ plugTy body τₓ ⟩∈ℰ⟦ plugKd K τₓ ⟧)
 
 functionInversion : ∀{τ J K} → ⟨ τ ⟩∈⟦ ℿ J K ⟧ → FunctionInversion J K τ
-functionInversion (denot-abs {J} {J'} {K} {body} J≤J' f) =
+functionInversion (denot-abs {J} {J'} {K} {body} J≤J' A∈K f) =
   F body J' J≤J' refl f
 
 rewriteInversionStep : ∀{gas} {A τ J body} →
@@ -153,16 +166,18 @@ semanticWidening (sk-intv A₂≤A₁ B₁≤B₂) (denot-intv τ-val A₁≤τ 
   denot-intv τ-val (st-trans A₂≤A₁ A₁≤τ) (st-trans τ≤B₁ B₁≤B₂)
 semanticWidening
     (sk-darr {J₁} {J₂} {K₁} {K₂} ℿJ₁K₁kd J₂≤J₁ K₁≤K₂)
-    (denot-abs {J₁} {J₁'} {K₁} {A} J₁≤J₁' f) =
+    (denot-abs {J₁} {J₁'} {K₁} {A} J₁≤J₁' A∈K f) =
   let f' : (τₓ : Type 0) → ⟨ τₓ ⟩∈'⟦ J₂ ⟧
          → ⟨ plugTy A τₓ ⟩∈ℰ⟦ plugKd K₂ τₓ ⟧
       f' τₓ τₓ∈'⟦J₂⟧ =
         let τ∈⟦J₁⟧ = semanticWidening J₂≤J₁ (denot-rec-ind-v τₓ∈'⟦J₂⟧)
             N gas τ A⟱τ τ∈⟦K₁⟧ = f τₓ (denot-ind-rec-v τ∈⟦J₁⟧)
          in
-        N gas τ A⟱τ (semanticWidening (sk-plug K₁≤K₂ {!!}) τ∈⟦K₁⟧)
+        N gas τ A⟱τ (semanticWidening
+                      (sk-plug K₁≤K₂ (denot-kd (denot-rec-ind-v τₓ∈'⟦J₂⟧)))
+                      τ∈⟦K₁⟧)
    in
-  denot-abs (sk-trans J₂≤J₁ J₁≤J₁') f'
+  denot-abs (sk-trans J₂≤J₁ J₁≤J₁') {!!} f'
 
 -- Following the other schemes, another name for [typesNormalize] would be
 -- kind-denot-ℰ
@@ -188,9 +203,10 @@ typesNormalize {ƛ J A} {ℿ J K} (k-abs J-kd A∈K) =
   let
     d-inner : (τₓ : Type zero) → ⟨ τₓ ⟩∈'⟦ J ⟧ →
       ⟨ plugTy A τₓ ⟩∈ℰ⟦ plugKd K τₓ ⟧
-    d-inner τₓ τₓ∈'⟦J⟧ = typesNormalize (kinding-subst A∈K {!!})
+    d-inner τₓ τₓ∈'⟦J⟧ =
+      typesNormalize (kinding-subst A∈K (denot-kd (denot-rec-ind-v τₓ∈'⟦J⟧)))
 
-    denot = denot-abs (sk-refl J-kd) d-inner
+    denot = denot-abs (sk-refl J-kd) A∈K d-inner
    in
   N 0 (ƛ J A) eval-ƛ denot
 typesNormalize (k-app A∈ℿJK B∈J K-kd KB-kd) =
@@ -199,6 +215,7 @@ typesNormalize (k-app A∈ℿJK B∈J K-kd KB-kd) =
       N b β B⟱β β∈⟦J⟧ = typesNormalize B∈J
       β-val = denot-val β∈⟦J⟧
       N n τ α∙β⟱τ τ∈⟦Kβ⟧ = body-terminates β (denot-ind-rec-v β∈⟦J⟧)
+      --Kβ==KB = reduction-refl-kd (reduction-order-invariant-kd B⟱β)
    in
   N (a + b + n)
     τ
@@ -207,8 +224,10 @@ typesNormalize (k-app A∈ℿJK B∈J K-kd KB-kd) =
     {!!}
 typesNormalize (k-sing A∈B∙∙C) =
   let N gas τ A⟱τ τ∈⟦B∙∙C⟧ = typesNormalize A∈B∙∙C
+      A∈✶ = intv-proper A∈B∙∙C
+      E A≤τ τ≤A = reduction-refl A∈✶ A⟱τ
    in
-  N gas τ A⟱τ {!!}
+  N gas τ A⟱τ (denot-intv (denot-val τ∈⟦B∙∙C⟧) A≤τ τ≤A)
 typesNormalize (k-sub A∈J J≤K) =
   let N gas τ A⟱τ τ∈⟦J⟧ = typesNormalize A∈J
    in

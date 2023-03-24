@@ -99,6 +99,14 @@ mutual
       left : Γ ⊢ty A ≤ B ∈ K
       right : Γ ⊢ty B ≤ A ∈ K
 
+  record _⊢kd_==_ {n}
+      (Γ : Context n) (K : Kind n) (J : Kind n) : Set where
+    inductive
+    constructor Ek
+    field
+      left : Γ ⊢kd K ≤ J
+      right : Γ ⊢kd J ≤ K
+
 eq-refl : ∀{n} {Γ : Context n} {A K} → Γ ⊢ty A ∈ K → Γ ⊢ty A == A ∈ K
 eq-refl A∈K = E (st-refl A∈K) (st-refl A∈K)
 
@@ -118,6 +126,9 @@ postulate
 
   kinding-subst : ∀{n} {Γ : Context n} {A τ J K} →
     J ∷ Γ ⊢ty A ∈ K → Γ ⊢ty τ ∈ J → Γ ⊢ty plugTy A τ ∈ plugKd K τ
+
+  wf-narrow : ∀{n} {Γ : Context n} {J J' K} →
+    J' ∷ Γ ⊢ K kd → Γ ⊢kd J ≤ J' → J ∷ Γ ⊢ K kd
 
 -- Lemmas
 

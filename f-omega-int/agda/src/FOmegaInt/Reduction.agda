@@ -8,6 +8,7 @@ open import FOmegaInt.Syntax hiding (Context; lookup)
 
 infix 4 _val
 infix 4 _⟱[_]_
+infix 4 _⟱kd_
 
 data _val : Type zero → Set where
   v-top : ⊤ val
@@ -27,6 +28,10 @@ data _⟱[_]_ : Type zero → ℕ → Type zero → Set where
     A ⟱[ a ] (ƛ K A') → B ⟱[ b ] β → plugTy A' β ⟱[ n ] τ →
     A ∙ B ⟱[ a + b + n ] τ
 
+data _⟱kd_ : Kind zero → Kind zero → Set where
+  eval-intv : ∀{A B α β a b} → A ⟱[ a ] α → B ⟱[ b ] β → A ∙∙ B ⟱kd α ∙∙ β
+  eval-darr : ∀{J J' K} → J ⟱kd J' → ℿ J K ⟱kd ℿ J' K
+
 -- Lemmas
 
 val-unique : ∀{τ : Type zero} →
@@ -45,4 +50,13 @@ val-unique (v-arr A₁ B₁) (v-arr A₂ B₂)
 ⟱-spec eval-ƛ = v-abs
 ⟱-spec (eval-arr A⟱ B⟱) = v-arr (⟱-spec A⟱) (⟱-spec B⟱)
 ⟱-spec (eval-app A⟱ƛA' B⟱β A'⟱τ) = ⟱-spec A'⟱τ
+
+-- Lemmas
+
+postulate
+  reduction-order-invariant : ∀{A T α τ gas₁ gas₂} →
+    plugTy A T ⟱[ gas₁ ] α → T ⟱[ gas₂ ] τ → plugTy A τ ⟱[ gas₁ ] α
+
+  reduction-order-invariant-kd : ∀{K k T τ gas} →
+    plugKd K T ⟱kd k → T ⟱[ gas ] τ → plugKd K τ ⟱kd k
 

@@ -20,6 +20,8 @@ postulate
   reduction-refl : ∀{gas K A τ} →
     [] ⊢ty A ∈ K → A ⟱[ gas ] τ → [] ⊢ty A == τ ∈ K
 
+  reduction-refl-kd : ∀{J K} → J ⟱kd K → [] ⊢kd J == K
+
 {-
 reduction-refl (k-sub A∈J J≤K) A⟱τ =
   let E τ≤A∈J A≤τ∈J = reduction-refl A∈J A⟱τ
