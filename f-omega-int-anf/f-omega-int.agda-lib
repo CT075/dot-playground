@@ -1,0 +1,4 @@
+name: f-omega-int
+depend: standard-library
+include: src/
+  ../vendor/shifted-names/src
