@@ -174,4 +174,3 @@ module _ {ℓ} (T : Set ℓ) (S : Set ℓ) (subst : Subst T S) where
   bind-wk-var-id : ∀ u v → bindVar u (wkVar v) ≡ var v
   bind-wk-var-id u (Bound n) = refl
   bind-wk-var-id u (Free name) = refl
-
