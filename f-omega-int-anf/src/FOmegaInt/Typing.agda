@@ -76,7 +76,7 @@ mutual
     sk-intv : ∀{A₁ A₂ B₁ B₂} →
       Γ ⊢ty A₂ ≤ A₁ ∈ ✶ → Γ ⊢ty B₁ ≤ B₂ ∈ ✶ → Γ ⊢kd A₁ ∙∙ B₁ ≤ A₂ ∙∙ B₂
     sk-darr : ∀{x J₁ J₂ K₁ K₂} →
-      Γ ⊢ ℿ J₁ K₁ kd → Γ ⊢kd J₂ ≤ J₁ →
+      Γ ⊢kd J₂ ≤ J₁ →
       Γ & x ~ (Kd J₂) ⊢kd openKind x K₁ ≤ openKind x K₂ →
       Γ ⊢kd ℿ J₁ K₁ ≤ ℿ J₂ K₂
 
