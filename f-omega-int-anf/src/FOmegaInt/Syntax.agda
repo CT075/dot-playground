@@ -1,10 +1,15 @@
 module FOmegaInt.Syntax where
 
-open import Data.Nat using (ℕ; suc; zero; _+_)
+open import Data.Nat using (ℕ; suc; zero; _+_; _<_; s≤s)
+open import Data.Nat.Properties using (<-transˡ; m≤m+n; m≤n+m)
 import Data.Vec as Vec
 open import Function.Base using (id)
+open import Relation.Binary.PropositionalEquality as PropEq hiding ([_])
+open import Induction.WellFounded
 
 open import Data.Var using (Var; Lift; Subst)
+
+infix 21 _⊡_
 
 mutual
   data Kind : Set where
@@ -30,6 +35,8 @@ data Term : Set where
   lettype_in'_ : Type → Term → Term
 
 pattern ✶ = ⊥ ∙∙ ⊤
+
+-- locally-nameless operations
 
 mutual
   liftKind : (Var → Var) → Kind → Kind
@@ -96,3 +103,75 @@ open Subst (record {lift = TermLift; var = id; subst = liftTerm}) renaming
   )
   hiding (bindVar)
   public
+
+-- termination measures
+
+infix 19 _<kd_ _<ty_ --_<tm_
+
+-- TODO: finish this explanation
+-- We don't need to recurse into the types (even though those types may
+-- themselves contain types) because [...]
+kd-size : Kind → ℕ
+kd-size (A ∙∙ B) = zero
+kd-size (ℿ J K) = suc (kd-size J + kd-size K)
+
+_<kd_ : Kind → Kind → Set
+J <kd K = kd-size J < kd-size K
+
+<kd-ℿ₁ : ∀ J K → J <kd ℿ J K
+<kd-ℿ₁ J K = s≤s (m≤m+n (kd-size J) (kd-size K))
+
+<kd-ℿ₂ : ∀ J K → K <kd ℿ J K
+<kd-ℿ₂ J K = s≤s (m≤n+m (kd-size K) (kd-size J))
+
+liftKind-preserves-size : ∀ (f : Var → Var) K →
+  kd-size (liftKind f K) ≡ kd-size K
+liftKind-preserves-size f (A ∙∙ B) = refl
+liftKind-preserves-size f (ℿ J K) = begin
+    kd-size (liftKind f (ℿ J K))
+  ≡⟨ refl ⟩
+    kd-size (ℿ (liftKind f J) (liftKind f K))
+  ≡⟨ refl ⟩
+    suc (kd-size (liftKind f J) + kd-size (liftKind f K))
+  ≡⟨ cong
+      (λ t → suc (t + kd-size (liftKind f K)))
+      (liftKind-preserves-size f J)
+   ⟩
+    suc (kd-size J + kd-size (liftKind f K))
+  ≡⟨ cong
+      (λ t → suc (kd-size J + t))
+      (liftKind-preserves-size f K)
+   ⟩
+    suc (kd-size J + kd-size K)
+  ≡⟨ refl ⟩
+    kd-size (ℿ J K)
+  ∎
+  where
+    open ≡-Reasoning
+
+liftKind-preserves-<₁ : ∀ J K (f : Var → Var) →
+  J <kd K → liftKind f J <kd K
+liftKind-preserves-<₁ J K f J<K rewrite liftKind-preserves-size f J = J<K
+
+mutual
+  <kd-wf : WellFounded (_<kd_)
+  <kd-wf K = acc (<kd-acc (kd-size K))
+
+  <kd-acc : ∀ i K → kd-size K < i → Acc _<kd_ K
+  <kd-acc zero K ()
+  <kd-acc (suc n) (A ∙∙ B) _ = acc (λ _ ())
+  <kd-acc (suc n) (ℿ J K) (s≤s ℿJK≤n) =
+    acc (λ J J<ℿJK → <kd-acc n J (<-transˡ J<ℿJK ℿJK≤n))
+
+module _ {ℓ} where
+  open All <kd-wf ℓ public
+    renaming ( wfRecBuilder to <kd-recBuilder
+             ; wfRec to <kd-rec
+             )
+    hiding (wfRec-builder)
+
+data _<ty_ : Type → Type → Set where
+  <ty-⇒₁ : ∀{A B} → A <ty A ⇒ B
+  <ty-⇒₂ : ∀{A B} → B <ty A ⇒ B
+  <ty-∀ : ∀{k τ} → τ <ty ∀' k τ
+  <ty-ƛ : ∀{k τ} → τ <ty ƛ k τ
